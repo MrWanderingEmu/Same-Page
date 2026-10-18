@@ -1,0 +1,14 @@
+{
+  "name": "Workbook Board",
+  "short_name": "Workbook",
+  "description": "A modelling whiteboard whose pages match student workbooks.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#e5e0d6",
+  "theme_color": "#faf8f4",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
