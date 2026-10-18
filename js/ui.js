@@ -11,6 +11,8 @@ import { undo, redo, clearVisible, canUndo, canRedo } from './history.js';
 import { stepPage, stepTarget, addPage, addPageAtEnd, deletePage, setTemplate, applyPaperToAll, toggleSpread, setBookStart } from './pages.js';
 import { exportPng, printAll } from './export.js';
 import { INSERTS, placeItem } from './shapes.js';
+import { hasSelection, clearSelection, deleteSelection, duplicateSelection, recolourSelection } from './select.js';
+import { hideDot } from './laser.js';
 
 /* --- tools --- */
 export function buildSwatches() {
@@ -18,20 +20,24 @@ export function buildSwatches() {
     box.innerHTML = PEN_COLOURS.map((_, i) => `<button class="swatch" data-colour="${i}" aria-label="Colour ${i + 1}"></button>`).join('');
   });
 }
-const sizeKey = () => state.tool === 'insert' ? 'pen' : state.tool;   // shapes use the pen's colour and size
+const sizeKey = () => ['pen', 'hl', 'eraser'].includes(state.tool) ? state.tool : 'pen';   // other tools use the pen's size
 export function renderTools() {
   $$('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === state.tool));
   $$('[data-act="insert"]').forEach(b => b.classList.toggle('on', state.tool === 'insert'));
-  const hl = state.tool === 'hl', er = state.tool === 'eraser';
+  const hl = state.tool === 'hl', er = state.tool === 'eraser', laser = state.tool === 'laser';
+  if (state.tool !== 'select') clearSelection();
+  if (!laser) hideDot();
   const cols = hl ? HL_COLOURS : PEN_COLOURS, ci = hl ? state.hlColour : state.penColour;
   $$('[data-swatches]').forEach(box => {
-    box.classList.toggle('dim', er);
-    box.querySelectorAll('.swatch').forEach((sw, i) => { sw.style.background = cols[i]; sw.classList.toggle('on', !er && i === ci); });
+    box.classList.toggle('dim', er || laser);
+    box.querySelectorAll('.swatch').forEach((sw, i) => { sw.style.background = cols[i]; sw.classList.toggle('on', !er && !laser && i === ci); });
   });
   const dots = er ? [9, 14, 21] : hl ? [8, 12, 17] : [5, 9, 14];
   $('#sizes').innerHTML = dots.map((d, i) =>
     `<button class="size${er ? ' ring' : ''}${state.size[sizeKey()] === i ? ' on' : ''}" data-size="${i}" aria-label="Size ${i + 1}"><i style="width:${d}px;height:${d}px"></i></button>`).join('');
   stage.classList.toggle('erasing', er);
+  stage.classList.toggle('lasering', laser);
+  $('#sizes').classList.toggle('dim', laser || state.tool === 'select');
   if (!er) hideEraser();
 }
 function setTool(t) { state.tool = t; state.insert = null; renderTools(); scheduleSave(); }
@@ -182,6 +188,7 @@ function onClick(e) {
   if (b.dataset.tool) return setTool(b.dataset.tool);
   if (b.dataset.colour != null) {
     const i = +b.dataset.colour;
+    if (state.tool === 'select' && hasSelection()) { recolourSelection(i); return; }
     if (state.tool === 'hl') state.hlColour = i;
     else { state.penColour = i; if (state.tool !== 'insert') state.tool = 'pen'; }
     renderTools(); scheduleSave(); return;
@@ -197,6 +204,8 @@ function onClick(e) {
   if (b.id === 'paperBtn') { if (openPop !== $('#paperPop')) renderPaperPop(); showPop($('#paperPop'), b); return; }
   if (b.id === 'menuBtn') { updateMenu(); showPop($('#menuPop'), b); return; }
   switch (b.dataset.act) {
+    case 'selDup': return duplicateSelection();
+    case 'selDel': return deleteSelection();
     case 'undo': return undo();
     case 'redo': return redo();
     case 'clear': return clearVisible();
@@ -223,16 +232,20 @@ function onKey(e) {
   if (ctrl && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if (ctrl && k === 'y') { e.preventDefault(); redo(); return; }
   if (ctrl && k === 's') { e.preventDefault(); saveNotebookFile(); return; }
+  if (ctrl && k === 'd' && hasSelection()) { e.preventDefault(); duplicateSelection(); return; }
   if (ctrl || e.altKey) return;
   if (k === 'p') setTool('pen');
   else if (k === 'h') setTool('hl');
   else if (k === 'e') setTool('eraser');
   else if (k === 'f') togglePresent();
   else if (k === 'b') toggleSpread();
+  else if (k === 's') setTool('select');
+  else if (k === 'l') setTool('laser');
+  else if ((k === 'delete' || k === 'backspace') && hasSelection()) { e.preventDefault(); deleteSelection(); }
   else if (k === 'i') { const b = state.presenting ? $('#mini [data-act="insert"]') : $('.rail [data-act="insert"]'); renderInsertPop(); showPop($('#insertPop'), b); }
   else if (k === 'arrowdown' || k === 'pagedown' || (k === 'arrowright' && !e.shiftKey)) { e.preventDefault(); stepPage(1); }
   else if (k === 'arrowup' || k === 'pageup' || k === 'arrowleft') { e.preventDefault(); stepPage(-1); }
-  else if (k === 'escape') { if (openPop) closePops(); else if (state.tool === 'insert') finishInsert(); else if (state.presenting) togglePresent(); }
+  else if (k === 'escape') { if (openPop) closePops(); else if (hasSelection()) clearSelection(); else if (state.tool === 'insert') finishInsert(); else if (state.presenting) togglePresent(); }
 }
 
 export function initUI() {

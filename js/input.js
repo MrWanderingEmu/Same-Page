@@ -5,7 +5,8 @@
      a pen has been used ('auto'), then they scroll / swipe pages instead.
    - Hold the pen still at the end of a stroke and a rough shape snaps into a clean one.
    - Insert tool: drag a box to place a shape or organiser (or tap to use its default size).
-   - Double-tap a page (pen or finger) to switch between one page and two. */
+   - Double-tap a page (pen or finger) to switch between one page and two.
+   - Select tool (select.js) and laser pointer (laser.js) get their gestures from here too. */
 import { PEN_COLOURS, HL_COLOURS, PEN_SIZES, HL_SIZES, ERASER_SIZES, HL_ALPHA } from './config.js';
 import { state } from './state.js';
 import { stage, view, sheets, sheetAt, clearLive, renderInkFor, showEraser, hideEraser } from './board.js';
@@ -15,6 +16,8 @@ import { scheduleSave } from './storage.js';
 import { setActive, stepPage, toggleFocus } from './pages.js';
 import { closePops, updateMenu, finishInsert } from './ui.js';
 import { recognise, densify, insertById, placeItem, tapBox } from './shapes.js';
+import { selDown, selMove, selUp } from './select.js';
+import { laserDown, laserMove, laserUp, showDot, hideDot } from './laser.js';
 
 let active = null;          // the current gesture
 let lastPen = -1e9;         // time of the last pen event (hover counts)
@@ -60,7 +63,17 @@ function onDown(e) {
   e.preventDefault();
   closePops();
   capture(e.pointerId);
+  const rect = rects[sheets.indexOf(sheet)];
+  if (state.tool === 'laser' && !wantsEraser(e)) {                         // pointing doesn't change the active page
+    active = { id: e.pointerId, ptype: e.pointerType, kind: 'laser', rect, trail: laserDown(sheet, toPage(e, rect)) };
+    showDot(e.clientX, e.clientY);
+    return;
+  }
   setActive(sheet.pi);
+  if (state.tool === 'select' && !wantsEraser(e)) {
+    active = { id: e.pointerId, ptype: e.pointerType, kind: 'select', rect, g: selDown(sheet, toPage(e, rect)) };
+    return;
+  }
   if (wantsEraser(e)) {
     active = { id: e.pointerId, ptype: e.pointerType, kind: 'erase', rects, before: new Map(), lx: e.clientX, ly: e.clientY };
     eraseAlong(e.clientX, e.clientY);
@@ -94,6 +107,11 @@ function onMove(e) {
   } else if (active.kind === 'insert') {
     active.b = toPage(e, active.rect);
     previewInsert(active);
+  } else if (active.kind === 'laser') {
+    for (const ev of evs) laserMove(active.trail, toPage(ev, active.rect));
+    showDot(e.clientX, e.clientY);
+  } else if (active.kind === 'select') {
+    selMove(active.g, toPage(e, active.rect));
   } else {
     for (const ev of evs) eraseAlong(ev.clientX, ev.clientY);
     showEraser(e.clientX, e.clientY);
@@ -132,6 +150,11 @@ function onEnd(e) {
     }
     commitStrokes(a, [a.s]);
     lastTap = tap ? { t: now, pg: a.pg, x, y, stroke: a.s } : null;
+  } else if (a.kind === 'laser') {
+    laserUp(a.trail);
+    if (e.pointerType === 'touch') hideDot();
+  } else if (a.kind === 'select') {
+    selUp(a.g, toPage(e, a.rect));
   } else if (a.kind === 'insert') {
     let p = a.a, q = a.b;
     if (Math.hypot(q[0] - p[0], q[1] - p[1]) < 3) ({ a: p, b: q } = tapBox(a.item, p, a.pg));
@@ -289,6 +312,7 @@ function eraseAlong(cx, cy) {
 }
 function hoverCursor(e) {
   if (e.pointerType === 'touch') return;
+  if (state.tool === 'laser') { showDot(e.clientX, e.clientY); return; }
   const eraserish = state.tool === 'eraser' || (e.pointerType === 'pen' && (e.buttons & 32));
   if (eraserish) showEraser(e.clientX, e.clientY); else hideEraser();
 }
@@ -298,6 +322,6 @@ export function initInput() {
   stage.addEventListener('pointermove', onMove);
   stage.addEventListener('pointerup', onEnd);
   stage.addEventListener('pointercancel', onEnd);
-  stage.addEventListener('pointerleave', () => { if (!active) hideEraser(); });
+  stage.addEventListener('pointerleave', () => { if (!active) { hideEraser(); hideDot(); } });
   stage.addEventListener('contextmenu', e => e.preventDefault());
 }

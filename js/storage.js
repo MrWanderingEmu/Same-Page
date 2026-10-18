@@ -126,7 +126,7 @@ function prefs() {
 }
 export function applyPrefs(p) {
   if (!p) return;
-  if (['pen', 'hl', 'eraser'].includes(p.tool)) state.tool = p.tool;
+  if (['pen', 'hl', 'eraser', 'select', 'laser'].includes(p.tool)) state.tool = p.tool;
   if (p.penColour in PEN_COLOURS) state.penColour = p.penColour | 0;
   if (p.hlColour in HL_COLOURS) state.hlColour = p.hlColour | 0;
   if (p.size) for (const k of ['pen', 'hl', 'eraser']) if (p.size[k] in [0, 1, 2]) state.size[k] = p.size[k] | 0;

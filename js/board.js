@@ -83,19 +83,29 @@ function renderBg(s) {
   const pg = s.kind === 'page' ? state.pages[s.pi] : s.kind === 'ghost' ? state.pages[state.pages.length - 1] : null;
   if (pg) drawTemplate(s.ctxBg, pg, view.scale * view.dpr);
 }
-function renderInk(s) {
+function renderInk(s, skip) {
   prep(s.ctxInk);
-  if (s.kind === 'page') for (const st of state.pages[s.pi].strokes) drawStroke(s.ctxInk, st);
+  if (s.kind === 'page') for (const st of state.pages[s.pi].strokes) if (!skip || !skip.has(st)) drawStroke(s.ctxInk, st);
 }
 export function clearLive(s) { prep(s.ctxLive); }
+
+/* Something drawn on top of the ink (the lasso selection) that must survive a redraw. */
+let overlay = null;
+export const setOverlay = fn => { overlay = fn; };
 
 export function renderAll() {
   assignSheets();
   for (const s of sheets) { renderBg(s); renderInk(s); clearLive(s); }
   updateFolios();
+  if (overlay) overlay();
 }
 export const sheetFor = pg => sheets.find(s => s.kind === 'page' && state.pages[s.pi] === pg);
-export function renderInkFor(pg) { const s = sheetFor(pg); if (s) renderInk(s); }
+/* Redraws a page's ink; skip = a Set of strokes to leave out (e.g. ones being dragged). */
+export function renderInkFor(pg, skip) {
+  const s = sheetFor(pg);
+  if (s) renderInk(s, skip);
+  if (overlay && !skip) overlay();
+}
 export function renderBgFor(pg) {
   for (const s of sheets) if ((s.kind === 'page' && state.pages[s.pi] === pg) || s.kind === 'ghost') renderBg(s);
 }

@@ -7,6 +7,8 @@ A modelling whiteboard for teachers whose pages match the students' exercise boo
 - **Pen, highlighter, eraser** with pressure, palm rejection, and the pen's eraser end or side button.
 - **Shape snapping:** draw a line, circle, oval, rectangle or triangle and hold the pen still at the end; it tidies into a clean shape (lines snap level when they're close). Works with the highlighter too, and can be turned off under *More*.
 - **Insert** shapes (line, arrow, rectangle, circle, triangles) and graphic organisers (T-chart, Venn, three-circle Venn, Y-chart, three columns, Frayer model, 2 × 2 grid, story mountain, mind map, number line, sequence). Drag a box to place one, or tap to fill the page. They're drawn in pen ink, so Undo and the eraser work on them.
+- **Select:** draw a loop round anything (or tap one line) to select it, then drag to move it, drag the corner handle to resize, tap a colour to recolour, or use *Duplicate* / *Delete*.
+- **Laser pointer:** a glowing red dot follows the pen, and anything you draw with it fades away a moment later. Nothing is saved.
 - **Double-tap a page** (pen or finger) to focus on it from two-page view; double-tap again to see both pages.
 - **Paper per page:** line spacing, margin, and template; *Use this paper on all pages* copies it to every page.
 - **Present mode** (**F**): full screen with a small floating toolbar.
@@ -18,13 +20,14 @@ A modelling whiteboard for teachers whose pages match the students' exercise boo
 | Key | Action |
 | --- | --- |
 | P / H / E | Pen / highlighter / eraser |
-| I | Insert a shape or organiser |
+| S / L / I | Select / laser pointer / insert a shape or organiser |
+| Delete, Ctrl+D | Delete or duplicate the selection |
 | B | One page ↔ two pages |
 | F | Present (Esc to stop) |
 | ↑ ↓ ← → / PgUp PgDn | Previous / next page (or pair of pages) |
 | Ctrl+Z / Ctrl+Y | Undo / redo |
 | Ctrl+S | Save this notebook to a file |
-| Esc | Close a menu, cancel Insert, leave present mode, or close the shelf |
+| Esc | Close a menu, deselect, cancel Insert, leave present mode, or close the shelf |
 
 ## Running it on your computer
 
@@ -58,6 +61,8 @@ js/draw.js            drawing paper templates and ink (pure canvas code)
 js/board.js           sizing the page(s) to the screen, one- and two-page view
 js/input.js           pen / mouse / touch, palm rejection, eraser, hold-to-snap, inserting, double-tap
 js/shapes.js          recognising drawn shapes; geometry for every shape and organiser
+js/select.js          lasso selection: move, resize, recolour, duplicate, delete
+js/laser.js           laser pointer trails and dot
 js/history.js         undo / redo across the whole notebook
 js/pages.js           navigating, adding, deleting pages; paper settings
 js/export.js          image export and print / PDF

@@ -35,7 +35,7 @@ input[type=text]{-webkit-user-select:text;user-select:text}
 .nbbtn span{max-width:72px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
   text-align:center;overflow-wrap:anywhere;line-height:1.2;font-weight:600}
 .badge{position:absolute;top:6px;right:15px;width:10px;height:10px;border-radius:50%;background:#e2700f;box-shadow:0 0 0 2px var(--rail)}
-@media (max-height:800px){ .rail .btn{min-height:46px} .rail .sep{margin:4px 0} }
+@media (max-height:800px){ .rail .btn{min-height:46px} .rail .sep{margin:4px 0} #mini{gap:2px} #mini .btn{min-height:40px} #mini .sep{margin:3px 0} }
 .pair{display:flex;gap:2px}
 .btn.half{width:34px;min-height:46px}
 .pagelabel{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;padding:2px 0;color:var(--ink);
@@ -67,7 +67,7 @@ input[type=text]{-webkit-user-select:text;user-select:text}
 .sheet canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .sheet .ink{mix-blend-mode:multiply}    /* highlighter shows template lines through it */
 #stage.erasing{cursor:none}
-#stage:not(.erasing){cursor:crosshair}
+#stage:not(.erasing):not(.lasering){cursor:crosshair}
 #ecursor{position:absolute;left:0;top:0;border-radius:50%;pointer-events:none;display:none;z-index:3;
   border:1.5px solid rgba(40,40,40,.7);background:rgba(255,255,255,.35);box-shadow:0 0 0 1px rgba(255,255,255,.8)}
 
@@ -146,6 +146,21 @@ input[type=range]{width:100%;height:32px;margin:0;accent-color:var(--accent);tou
 .ins:hover{background:var(--hover)}
 .ins.on{background:var(--accent-soft);color:var(--accent)}
 .ins svg{width:48px;height:40px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+
+/* lasso selection actions */
+#selbar{position:fixed;left:0;top:0;z-index:6;display:flex;gap:2px;padding:4px;background:#fff;border-radius:12px;
+  box-shadow:0 2px 6px rgba(0,0,0,.12),0 8px 22px rgba(0,0,0,.14)}
+#selbar button{display:flex;align-items:center;gap:6px;border:0;background:transparent;border-radius:9px;padding:9px 12px;
+  font-size:13px;cursor:pointer;touch-action:manipulation}
+#selbar button:hover{background:var(--hover)}
+#selbar button.danger{color:var(--danger)}
+#selbar svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* laser pointer dot */
+#laserdot{position:fixed;left:-8px;top:-8px;width:16px;height:16px;border-radius:50%;pointer-events:none;z-index:7;display:none;
+  background:radial-gradient(circle,#fff 0 18%,#ff2b2b 34% 55%,rgba(255,43,43,0) 72%);box-shadow:0 0 12px 4px rgba(255,30,30,.55)}
+#stage.lasering{cursor:none}
+.sizes.dim{opacity:.35;pointer-events:none}
 
 /* ---------- present mode ---------- */
 body.presenting #app{grid-template-columns:1fr}
