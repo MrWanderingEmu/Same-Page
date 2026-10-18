@@ -1,7 +1,7 @@
 /* Toolbars, popovers, present mode, and the click / keyboard handlers. */
 import { PAGE_W, PEN_COLOURS, HL_COLOURS, TEMPLATES } from './config.js';
 import { state, page, makePage, visiblePages } from './state.js';
-import { $, $$ } from './util.js';
+import { $, $$, toast } from './util.js';
 import { stage, layout, renderBgFor, hideEraser } from './board.js';
 import { drawTemplate } from './draw.js';
 import { scheduleSave, saveNow } from './storage.js';
@@ -10,6 +10,7 @@ import { openShelf, shelfOpen, shelfEscape } from './shelf.js';
 import { undo, redo, clearVisible, canUndo, canRedo } from './history.js';
 import { stepPage, stepTarget, addPage, addPageAtEnd, deletePage, setTemplate, applyPaperToAll, toggleSpread, setBookStart } from './pages.js';
 import { exportPng, printAll } from './export.js';
+import { INSERTS, placeItem } from './shapes.js';
 
 /* --- tools --- */
 export function buildSwatches() {
@@ -17,8 +18,10 @@ export function buildSwatches() {
     box.innerHTML = PEN_COLOURS.map((_, i) => `<button class="swatch" data-colour="${i}" aria-label="Colour ${i + 1}"></button>`).join('');
   });
 }
+const sizeKey = () => state.tool === 'insert' ? 'pen' : state.tool;   // shapes use the pen's colour and size
 export function renderTools() {
   $$('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === state.tool));
+  $$('[data-act="insert"]').forEach(b => b.classList.toggle('on', state.tool === 'insert'));
   const hl = state.tool === 'hl', er = state.tool === 'eraser';
   const cols = hl ? HL_COLOURS : PEN_COLOURS, ci = hl ? state.hlColour : state.penColour;
   $$('[data-swatches]').forEach(box => {
@@ -27,11 +30,39 @@ export function renderTools() {
   });
   const dots = er ? [9, 14, 21] : hl ? [8, 12, 17] : [5, 9, 14];
   $('#sizes').innerHTML = dots.map((d, i) =>
-    `<button class="size${er ? ' ring' : ''}${state.size[state.tool] === i ? ' on' : ''}" data-size="${i}" aria-label="Size ${i + 1}"><i style="width:${d}px;height:${d}px"></i></button>`).join('');
+    `<button class="size${er ? ' ring' : ''}${state.size[sizeKey()] === i ? ' on' : ''}" data-size="${i}" aria-label="Size ${i + 1}"><i style="width:${d}px;height:${d}px"></i></button>`).join('');
   stage.classList.toggle('erasing', er);
   if (!er) hideEraser();
 }
-function setTool(t) { state.tool = t; renderTools(); scheduleSave(); }
+function setTool(t) { state.tool = t; state.insert = null; renderTools(); scheduleSave(); }
+
+/* --- insert tool --- */
+const ICON_BOX = { Shapes: [[9, 5], [39, 35]], Organisers: [[3, 3], [45, 37]] };
+function insertIcon(item) {
+  const [a, b] = item.id === 'line' || item.id === 'arrow' ? [[7, 33], [41, 7]] : ICON_BOX[item.group];
+  return `<svg viewBox="0 0 48 40">${placeItem(item, a, b).map(pl =>
+    `<polyline points="${pl.map(p => p.map(v => v.toFixed(1)).join(',')).join(' ')}"/>`).join('')}</svg>`;
+}
+function renderInsertPop() {
+  const groups = [...new Set(INSERTS.map(i => i.group))];
+  $('#insertPop').innerHTML = groups.map(g => `<div class="group">${g}</div><div class="inserts">${INSERTS.filter(i => i.group === g).map(i =>
+    `<button class="ins${state.tool === 'insert' && state.insert === i.id ? ' on' : ''}" data-insert="${i.id}">${insertIcon(i)}${i.label}</button>`).join('')}</div>`).join('') +
+    '<p class="note" style="margin:0">Pick one, then drag a box on the page. For an organiser, tap the page instead to fill it.</p>';
+}
+function chooseInsert(id) {
+  const item = INSERTS.find(i => i.id === id);
+  if (state.tool !== 'insert') state.prevTool = state.tool === 'eraser' ? 'pen' : state.tool;
+  state.tool = 'insert'; state.insert = id;
+  closePops(); renderTools();
+  const name = item.say || item.label.toLowerCase();
+  toast(item.fit === 'page' ? `Drag a box for the ${name}, or tap the page to fill it.`
+    : item.fit === 'band' ? `Drag to place the ${name}, or tap for the full width.` : `Drag on the page to draw a ${name}.`);
+}
+/* Back to the pen (or highlighter) after placing something, or on Esc. */
+export function finishInsert() {
+  state.tool = state.prevTool || 'pen'; state.insert = null;
+  renderTools(); scheduleSave();
+}
 
 /* --- status --- */
 export function updateUndo() {
@@ -120,6 +151,7 @@ export function updateMenu() {
   $$('#bookStartSeg button').forEach(b => b.classList.toggle('on', b.dataset.bookstart === state.bookStart));
   $$('#fingerSeg button').forEach(b => b.classList.toggle('on', b.dataset.finger === state.finger));
   $$('#pressureSeg button').forEach(b => b.classList.toggle('on', (b.dataset.pressure === 'on') === state.pressure));
+  $$('#snapSeg button').forEach(b => b.classList.toggle('on', (b.dataset.snap === 'on') === state.snap));
   $('#fingerNote').textContent = {
     auto: state.penSeen ? 'Pen detected: fingers scroll and swipe between pages.' : 'Fingers draw until you use the pen, then they scroll.',
     scroll: 'Fingers scroll the page and swipe between pages.',
@@ -151,10 +183,13 @@ function onClick(e) {
   if (b.dataset.colour != null) {
     const i = +b.dataset.colour;
     if (state.tool === 'hl') state.hlColour = i;
-    else { state.penColour = i; state.tool = 'pen'; }
+    else { state.penColour = i; if (state.tool !== 'insert') state.tool = 'pen'; }
     renderTools(); scheduleSave(); return;
   }
-  if (b.dataset.size != null) { state.size[state.tool] = +b.dataset.size; renderTools(); scheduleSave(); return; }
+  if (b.dataset.size != null) { state.size[sizeKey()] = +b.dataset.size; renderTools(); scheduleSave(); return; }
+  if (b.dataset.insert) return chooseInsert(b.dataset.insert);
+  if (b.dataset.act === 'insert') { renderInsertPop(); showPop($('#insertPop'), b); return; }
+  if (b.dataset.snap) { state.snap = b.dataset.snap === 'on'; updateMenu(); scheduleSave(); return; }
   if (b.dataset.tpl) return setTemplate(b.dataset.tpl);
   if (b.dataset.bookstart) { setBookStart(b.dataset.bookstart); updateMenu(); return; }
   if (b.dataset.finger) { state.finger = b.dataset.finger; updateMenu(); scheduleSave(); return; }
@@ -194,9 +229,10 @@ function onKey(e) {
   else if (k === 'e') setTool('eraser');
   else if (k === 'f') togglePresent();
   else if (k === 'b') toggleSpread();
+  else if (k === 'i') { const b = state.presenting ? $('#mini [data-act="insert"]') : $('.rail [data-act="insert"]'); renderInsertPop(); showPop($('#insertPop'), b); }
   else if (k === 'arrowdown' || k === 'pagedown' || (k === 'arrowright' && !e.shiftKey)) { e.preventDefault(); stepPage(1); }
   else if (k === 'arrowup' || k === 'pageup' || k === 'arrowleft') { e.preventDefault(); stepPage(-1); }
-  else if (k === 'escape') { if (openPop) closePops(); else if (state.presenting) togglePresent(); }
+  else if (k === 'escape') { if (openPop) closePops(); else if (state.tool === 'insert') finishInsert(); else if (state.presenting) togglePresent(); }
 }
 
 export function initUI() {

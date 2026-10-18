@@ -54,3 +54,14 @@ export function clearVisible() {
   scheduleSave();
   toast(pgs.length > 1 ? 'Both pages cleared — press Undo to bring them back.' : 'Page cleared — press Undo to bring it back.');
 }
+
+/* Quietly removes a stroke that was just added (the first dot of a double-tap),
+   along with its undo step, as if it was never drawn. */
+export function discardLast(pg, stroke) {
+  const last = hist.undo[hist.undo.length - 1];
+  if (!last || last.length !== 1 || last[0].pg !== pg || pg.strokes[pg.strokes.length - 1] !== stroke) return false;
+  hist.undo.pop();
+  pg.strokes = last[0].strokes;
+  renderInkFor(pg); updateUndo(); scheduleSave();
+  return true;
+}

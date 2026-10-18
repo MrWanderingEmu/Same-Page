@@ -121,8 +121,8 @@ export function metaRecord() {
 }
 
 function prefs() {
-  const { tool, penColour, hlColour, size, finger, pressure, penSeen } = state;
-  return { tool, penColour, hlColour, size, finger, pressure, penSeen };
+  const { penColour, hlColour, size, finger, pressure, penSeen, snap } = state;
+  return { tool: state.tool === 'insert' ? state.prevTool : state.tool, penColour, hlColour, size, finger, pressure, penSeen, snap };
 }
 export function applyPrefs(p) {
   if (!p) return;
@@ -132,6 +132,7 @@ export function applyPrefs(p) {
   if (p.size) for (const k of ['pen', 'hl', 'eraser']) if (p.size[k] in [0, 1, 2]) state.size[k] = p.size[k] | 0;
   if (['auto', 'scroll', 'draw'].includes(p.finger)) state.finger = p.finger;
   if (typeof p.pressure === 'boolean') state.pressure = p.pressure;
+  if (typeof p.snap === 'boolean') state.snap = p.snap;
   state.penSeen = !!p.penSeen;
 }
 

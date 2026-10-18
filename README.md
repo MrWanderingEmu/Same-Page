@@ -5,6 +5,9 @@ A modelling whiteboard for teachers whose pages match the students' exercise boo
 - **A shelf of notebooks:** the *Notebooks* button (top of the right toolbar) shows every notebook as an exercise-book cover: one for spelling, one for novel study, one for maths examples, and so on. Each has its own name, cover colour and starting paper, and remembers its own last page and view.
 - **One page or two:** *Two pages* (or press **B**) shows the book lying open: two A4 pages side by side with the spine down the middle. By default page 1 sits on the right, opposite the inside cover, like a real exercise book; *More › Two-page view starts with* changes that to pages 1 and 2 together.
 - **Pen, highlighter, eraser** with pressure, palm rejection, and the pen's eraser end or side button.
+- **Shape snapping:** draw a line, circle, oval, rectangle or triangle and hold the pen still at the end; it tidies into a clean shape (lines snap level when they're close). Works with the highlighter too, and can be turned off under *More*.
+- **Insert** shapes (line, arrow, rectangle, circle, triangles) and graphic organisers (T-chart, Venn, three-circle Venn, Y-chart, three columns, Frayer model, 2 × 2 grid, story mountain, mind map, number line, sequence). Drag a box to place one, or tap to fill the page. They're drawn in pen ink, so Undo and the eraser work on them.
+- **Double-tap a page** (pen or finger) to focus on it from two-page view; double-tap again to see both pages.
 - **Paper per page:** line spacing, margin, and template; *Use this paper on all pages* copies it to every page.
 - **Present mode** (**F**): full screen with a small floating toolbar.
 - **Saves automatically** in the browser, one page at a time, so big notebooks stay quick. *Back up all* on the shelf saves every notebook into one file (a reminder appears on the shelf if it's been 3 weeks), and *Open a file* restores a backup or adds a single notebook file. *Print or save as PDF* prints every page at true A4.
@@ -15,12 +18,13 @@ A modelling whiteboard for teachers whose pages match the students' exercise boo
 | Key | Action |
 | --- | --- |
 | P / H / E | Pen / highlighter / eraser |
+| I | Insert a shape or organiser |
 | B | One page ↔ two pages |
 | F | Present (Esc to stop) |
 | ↑ ↓ ← → / PgUp PgDn | Previous / next page (or pair of pages) |
 | Ctrl+Z / Ctrl+Y | Undo / redo |
 | Ctrl+S | Save this notebook to a file |
-| Esc | Leave present mode, close a menu, or close the shelf |
+| Esc | Close a menu, cancel Insert, leave present mode, or close the shelf |
 
 ## Running it on your computer
 
@@ -52,7 +56,8 @@ js/state.js           app state, page model, which pages are on screen
 js/storage.js         auto-save (IndexedDB): only the pages that changed; moving older saved work over
 js/draw.js            drawing paper templates and ink (pure canvas code)
 js/board.js           sizing the page(s) to the screen, one- and two-page view
-js/input.js           pen / mouse / touch, palm rejection, eraser
+js/input.js           pen / mouse / touch, palm rejection, eraser, hold-to-snap, inserting, double-tap
+js/shapes.js          recognising drawn shapes; geometry for every shape and organiser
 js/history.js         undo / redo across the whole notebook
 js/pages.js           navigating, adding, deleting pages; paper settings
 js/export.js          image export and print / PDF

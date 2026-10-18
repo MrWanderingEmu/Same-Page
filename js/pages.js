@@ -77,3 +77,15 @@ export function setBookStart(v) {
   if (state.spread) { renderAll(); updatePageUI(); }
   scheduleSave();
 }
+
+/* Double-tap: from two pages, focus on the page tapped; from one page, back to two. */
+let focusHinted = false;
+export function toggleFocus(i) {
+  if (state.spread) {
+    state.cur = i;
+    toggleSpread();
+    if (!focusHinted) { focusHinted = true; toast('Double-tap again to see both pages.'); }
+  } else {
+    toggleSpread();
+  }
+}

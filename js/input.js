@@ -2,19 +2,26 @@
    - Pen and mouse draw. The pen's eraser end or side (barrel) button erases.
    - A stroke belongs to the page it starts on. The eraser works across both pages.
    - Touch: palms are ignored while the pen is near the screen. Fingers draw until
-     a pen has been used ('auto'), then they scroll / swipe pages instead. */
+     a pen has been used ('auto'), then they scroll / swipe pages instead.
+   - Hold the pen still at the end of a stroke and a rough shape snaps into a clean one.
+   - Insert tool: drag a box to place a shape or organiser (or tap to use its default size).
+   - Double-tap a page (pen or finger) to switch between one page and two. */
 import { PEN_COLOURS, HL_COLOURS, PEN_SIZES, HL_SIZES, ERASER_SIZES, HL_ALPHA } from './config.js';
 import { state } from './state.js';
 import { stage, view, sheets, sheetAt, clearLive, renderInkFor, showEraser, hideEraser } from './board.js';
 import { penStyle, drawSeg, drawDot, tracePath, drawStroke } from './draw.js';
-import { pushUndo, record } from './history.js';
+import { pushUndo, record, discardLast } from './history.js';
 import { scheduleSave } from './storage.js';
-import { setActive, stepPage } from './pages.js';
-import { closePops, updateMenu } from './ui.js';
+import { setActive, stepPage, toggleFocus } from './pages.js';
+import { closePops, updateMenu, finishInsert } from './ui.js';
+import { recognise, densify, insertById, placeItem, tapBox } from './shapes.js';
 
 let active = null;          // the current gesture
 let lastPen = -1e9;         // time of the last pen event (hover counts)
 const PALM_WINDOW = 700;    // ms after a pen event during which touches are ignored
+const HOLD_MS = 450;        // keep the pen this still (ms) at the end of a stroke to snap it to a shape
+const DOUBLE_MS = 350;      // two taps within this time make a double-tap
+let lastTap = null;         // the previous tap, to spot double-taps
 function capture(id) { try { stage.setPointerCapture(id); } catch (e) {} }
 
 const touchMode = () => state.finger !== 'auto' ? state.finger : (state.penSeen ? 'scroll' : 'draw');
@@ -41,7 +48,7 @@ function onDown(e) {
   if (e.pointerType === 'touch') {
     if (now - lastPen < PALM_WINDOW) return;                              // palm rejection
     if (touchMode() === 'scroll') {
-      active = { id: e.pointerId, ptype: 'touch', kind: 'pan', x: e.clientX, y: e.clientY, st: stage.scrollTop, sl: stage.scrollLeft };
+      active = { id: e.pointerId, ptype: 'touch', kind: 'pan', x: e.clientX, y: e.clientY, st: stage.scrollTop, sl: stage.scrollLeft, t0: now };
       capture(e.pointerId);
       return;
     }
@@ -58,6 +65,8 @@ function onDown(e) {
     active = { id: e.pointerId, ptype: e.pointerType, kind: 'erase', rects, before: new Map(), lx: e.clientX, ly: e.clientY };
     eraseAlong(e.clientX, e.clientY);
     showEraser(e.clientX, e.clientY);
+  } else if (state.tool === 'insert') {
+    startInsert(e, sheet, rects[sheets.indexOf(sheet)]);
   } else {
     startStroke(e, sheet, rects[sheets.indexOf(sheet)]);
   }
@@ -74,12 +83,17 @@ function onMove(e) {
   const evs = (e.getCoalescedEvents && e.getCoalescedEvents().length) ? e.getCoalescedEvents() : [e];
   if (active.kind === 'stroke') {
     const { s, sheet, rect } = active;
+    if (active.snapped) return;                                  // already a clean shape: wait for the pen to lift
     if (s.t === 'pen') penStyle(sheet.ctxLive, s);
     for (const ev of evs) {
       const [x, y] = toPage(ev, rect);
       if (addPoint(ev, x, y) && s.t === 'pen') drawSeg(sheet.ctxLive, s, s.p.length / 3 - 1);
     }
     if (s.t === 'hl') drawHlLive(sheet, s);
+    watchHold(toPage(e, rect));
+  } else if (active.kind === 'insert') {
+    active.b = toPage(e, active.rect);
+    previewInsert(active);
   } else {
     for (const ev of evs) eraseAlong(ev.clientX, ev.clientY);
     showEraser(e.clientX, e.clientY);
@@ -89,13 +103,40 @@ function onMove(e) {
 function onEnd(e) {
   if (!active || e.pointerId !== active.id) return;
   const a = active; active = null;
+  clearTimeout(a.holdTimer);
+  const now = performance.now();
   if (a.kind === 'pan') {
     // Swipe left/right to change page (or spread) when the page isn't scrollable.
     const dx = e.clientX - a.x, dy = e.clientY - a.y;
     const scrollable = stage.scrollHeight > stage.clientHeight + 2;
     if (!scrollable && Math.abs(dx) > 90 && Math.abs(dx) > 2 * Math.abs(dy)) stepPage(dx < 0 ? 1 : -1);
+    else if (Math.hypot(dx, dy) < 10 && now - a.t0 < 300) {                       // a finger tap
+      const prev = lastTap;
+      lastTap = { t: now, x: e.clientX, y: e.clientY };
+      if (prev && !prev.pg && now - prev.t < DOUBLE_MS && Math.hypot(prev.x - e.clientX, prev.y - e.clientY) < 30) {
+        lastTap = null;
+        const sheet = sheetAt(e.clientX, sheets.map(s => s.el.getBoundingClientRect()));
+        if (sheet.kind === 'page') toggleFocus(sheet.pi);
+      }
+    }
   } else if (a.kind === 'stroke') {
-    commitStroke(a);
+    if (a.snapped) { commitStrokes(a, a.snapped); lastTap = null; return; }
+    const tap = isTap(a, now), x = a.s.p[0], y = a.s.p[1], prev = lastTap;
+    if (tap && prev && prev.pg === a.pg && now - prev.t < DOUBLE_MS && Math.hypot(prev.x - x, prev.y - y) < 2.5) {
+      // A double-tap with the pen: take away the first dot, don't add the second.
+      clearLive(a.sheet);
+      discardLast(prev.pg, prev.stroke);
+      lastTap = null;
+      toggleFocus(state.pages.indexOf(a.pg));
+      return;
+    }
+    commitStrokes(a, [a.s]);
+    lastTap = tap ? { t: now, pg: a.pg, x, y, stroke: a.s } : null;
+  } else if (a.kind === 'insert') {
+    let p = a.a, q = a.b;
+    if (Math.hypot(q[0] - p[0], q[1] - p[1]) < 3) ({ a: p, b: q } = tapBox(a.item, p, a.pg));
+    commitStrokes(a, shapeStrokes(placeItem(a.item, p, q), 'pen', PEN_COLOURS[state.penColour], PEN_SIZES[state.size.pen]));
+    finishInsert();
   } else if (a.kind === 'erase') {
     if (a.before.size) { record([...a.before].map(([pg, strokes]) => ({ pg, strokes }))); scheduleSave(); }
     if (state.tool !== 'eraser' || e.pointerType === 'touch') hideEraser();
@@ -111,11 +152,52 @@ function startStroke(e, sheet, rect) {
     pr: !hl && state.pressure && e.pointerType === 'pen',
     p: [],
   };
-  active = { id: e.pointerId, ptype: e.pointerType, kind: 'stroke', s, sheet, rect, pg: state.pages[sheet.pi] };
+  active = { id: e.pointerId, ptype: e.pointerType, kind: 'stroke', s, sheet, rect, pg: state.pages[sheet.pi], t0: performance.now() };
   const [x, y] = toPage(e, rect);
   addPoint(e, x, y);
   clearLive(sheet);
   if (hl) drawHlLive(sheet, s); else { penStyle(sheet.ctxLive, s); drawDot(sheet.ctxLive, s); }
+  watchHold([x, y]);
+}
+
+/* A quick touch that barely moved: a dot, or half of a double-tap. */
+function isTap(a, now) {
+  if (now - a.t0 > 300) return false;
+  const p = a.s.p;
+  for (let i = 3; i < p.length; i += 3) if (Math.abs(p[i] - p[0]) > 1.2 || Math.abs(p[i + 1] - p[1]) > 1.2) return false;
+  return true;
+}
+
+/* --- hold to snap: if the pen stays still for HOLD_MS, try to recognise the stroke as a shape --- */
+function watchHold(pt) {
+  const a = active;
+  if (!state.snap || a.snapped) return;
+  if (a.hold && Math.hypot(pt[0] - a.hold[0], pt[1] - a.hold[1]) < 0.8) return;   // still holding still
+  a.hold = pt;
+  clearTimeout(a.holdTimer);
+  a.holdTimer = setTimeout(() => {
+    if (active !== a || a.snapped) return;
+    const shape = recognise(a.s.p);
+    if (!shape) return;
+    a.snapped = shapeStrokes(shape.polys, a.s.t, a.s.c, a.s.w);
+    clearLive(a.sheet);
+    a.snapped.forEach(st => drawStroke(a.sheet.ctxLive, st));
+  }, HOLD_MS);
+}
+const shapeStrokes = (polys, t, c, w) => polys.map(pl => ({ t, c, w, pr: false, p: densify(pl) }));
+
+/* --- insert tool: drag out a box --- */
+function startInsert(e, sheet, rect) {
+  const item = insertById(state.insert);
+  if (!item) { finishInsert(); return; }
+  const p = toPage(e, rect);
+  active = { id: e.pointerId, ptype: e.pointerType, kind: 'insert', item, sheet, rect, pg: state.pages[sheet.pi], a: p, b: p };
+}
+function previewInsert(a) {
+  clearLive(a.sheet);
+  if (Math.hypot(a.b[0] - a.a[0], a.b[1] - a.a[1]) < 3) return;
+  shapeStrokes(placeItem(a.item, a.a, a.b), 'pen', PEN_COLOURS[state.penColour], PEN_SIZES[state.size.pen])
+    .forEach(st => drawStroke(a.sheet.ctxLive, st));
 }
 
 function addPoint(ev, x, y) {
@@ -140,12 +222,14 @@ function drawHlLive(sheet, s) {
   ctx.restore();
 }
 
-function commitStroke({ s, sheet, pg }) {
+/* Adds strokes to the gesture's page as one undoable step. */
+function commitStrokes({ sheet, pg }, strokes) {
   clearLive(sheet);
-  if (!s.p.length || !state.pages.includes(pg)) return;
+  strokes = strokes.filter(s => s.p.length);
+  if (!strokes.length || !state.pages.includes(pg)) return;
   pushUndo(pg, pg.strokes.slice());
-  pg.strokes.push(s);
-  if (sheet.kind === 'page' && state.pages[sheet.pi] === pg) drawStroke(sheet.ctxInk, s);
+  pg.strokes.push(...strokes);
+  if (sheet.kind === 'page' && state.pages[sheet.pi] === pg) strokes.forEach(s => drawStroke(sheet.ctxInk, s));
   else renderInkFor(pg);
   scheduleSave();
 }

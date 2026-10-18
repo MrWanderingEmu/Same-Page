@@ -11,6 +11,9 @@ export const state = {
   bookStart: 'right',    // 'right' = page 1 sits opposite the inside cover; 'left' = pages 1 and 2 together
   // Saved once for the whole app:
   tool: 'pen', penColour: 0, hlColour: 0,
+  insert: null,          // the shape or organiser the Insert tool will place (see shapes.js)
+  prevTool: 'pen',       // tool to go back to after inserting
+  snap: true,            // hold the pen still at the end of a stroke to snap it to a shape
   size: { pen: 1, hl: 1, eraser: 1 },
   finger: 'auto',        // 'auto' | 'scroll' | 'draw'
   pressure: true,
