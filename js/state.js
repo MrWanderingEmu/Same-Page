@@ -1,22 +1,27 @@
 /* App state, the page model, and which pages are on screen. */
 import { TEMPLATES } from './config.js';
-import { clamp } from './util.js';
+import { clamp, uid } from './util.js';
 
 export const state = {
+  nb: null,              // the open notebook: { id, title, colour, created, updated }
   pages: [], cur: 0,     // cur = the active page (the one last drawn on, or navigated to)
-  tool: 'pen', penColour: 0, hlColour: 0,
-  size: { pen: 1, hl: 1, eraser: 1 },
+  // Saved with each notebook:
   view: 'page',          // 'page' = whole page fits, 'width' = page fills width and scrolls
   spread: false,         // true = two pages side by side, like an open book
   bookStart: 'right',    // 'right' = page 1 sits opposite the inside cover; 'left' = pages 1 and 2 together
+  // Saved once for the whole app:
+  tool: 'pen', penColour: 0, hlColour: 0,
+  size: { pen: 1, hl: 1, eraser: 1 },
   finger: 'auto',        // 'auto' | 'scroll' | 'draw'
   pressure: true,
   penSeen: false,        // set the first time a stylus is used (drives finger 'auto')
   presenting: false,
 };
 
-export function makePage(src) {
+/* A new page, copying the paper (not the ink) of src if given. */
+export function makePage(src, id) {
   const p = {
+    id: typeof id === 'string' && id ? id : uid(),
     tpl: 'ruled',
     spacing: { ruled: TEMPLATES.ruled.spacing.def, thirds: TEMPLATES.thirds.spacing.def, grid: TEMPLATES.grid.spacing.def },
     margin:  { ruled: TEMPLATES.ruled.margin, thirds: TEMPLATES.thirds.margin, grid: TEMPLATES.grid.margin },

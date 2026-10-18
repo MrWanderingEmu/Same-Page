@@ -1,7 +1,7 @@
 /* PNG export (the page or pages on screen) and print-to-PDF (every page, true A4). */
 import { PAGE_W, PAGE_H } from './config.js';
 import { state, visiblePages } from './state.js';
-import { $, toast, download, dateStr } from './util.js';
+import { $, toast, download, dateStr, slug } from './util.js';
 import { drawTemplate, drawStroke } from './draw.js';
 import { closePops } from './ui.js';
 
@@ -25,7 +25,7 @@ export function exportPng() {
   const idx = visiblePages();
   renderPagesCanvas(idx.map(i => state.pages[i]), 8).toBlob(b => {            // ~200 dpi
     if (!b) { toast("Couldn't create the image."); return; }
-    download(b, `same-page-${dateStr()}-p${idx.map(i => i + 1).join('-')}.png`);
+    download(b, `${slug(state.nb ? state.nb.title : "same-page")}-${dateStr()}-p${idx.map(i => i + 1).join('-')}.png`);
     toast(idx.length > 1 ? 'Pages saved as an image.' : 'Page saved as an image.');
   }, 'image/png');
 }

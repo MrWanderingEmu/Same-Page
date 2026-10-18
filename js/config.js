@@ -17,3 +17,4 @@ export const TEMPLATES = {
 };
 export const LINE_COL = { ruled: '#9ec3e6', thirds: '#9ec3e6', base: '#6f9fd2', grid: '#b6d0ea', margin: '#e48b8b' };
 export const MAX_UNDO = 200;
+export const COVER_COLOURS = ['#35507a', '#a33d3d', '#3c7a4e', '#c8901e', '#6a4c98', '#c0577f', '#2c7b84', '#59626d'];

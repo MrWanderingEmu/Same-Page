@@ -54,6 +54,8 @@
 
   <!-- RIGHT RAIL: pages + paper + view -->
   <nav class="rail right" aria-label="Pages">
+    <button class="btn nbbtn" id="shelfBtn" title="Your notebooks"><svg viewBox="0 0 24 24"><path d="M4.5 4h3.5v16H4.5zM10 4h3.5v16H10z"/><path d="M15.6 5.1l3.3-.9 3.6 15.1-3.3.9z"/></svg><span id="railNbTitle">Notebooks</span><i class="badge" hidden></i></button>
+    <div class="sep"></div>
     <button class="btn" data-act="prev" title="Previous page (↑ / PgUp)"><svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg>Prev</button>
     <div class="pagelabel" data-pagelabel>1 / 1</div>
     <button class="btn" data-act="next" title="Next page (↓ / PgDn)"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>Next</button>
@@ -74,8 +76,7 @@
 
 <!-- Menu popover -->
 <div class="pop" id="menuPop" role="dialog" aria-label="More">
-  <button class="menu-item" data-act="saveFile"><svg viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5"/><path d="M5 19h14"/></svg>Save notebook to file</button>
-  <button class="menu-item" data-act="openFile"><svg viewBox="0 0 24 24"><path d="M12 15V4M7.5 8.5L12 4l4.5 4.5"/><path d="M5 19h14"/></svg>Open notebook file</button>
+  <button class="menu-item" data-act="saveFile"><svg viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5"/><path d="M5 19h14"/></svg>Save this notebook to a file</button>
   <button class="menu-item" data-act="png"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9.5" r="1.5"/><path d="M20 15.5l-4.5-4.5L6 20"/></svg><span id="pngLabel">Save this page as an image</span></button>
   <button class="menu-item" data-act="print"><svg viewBox="0 0 24 24"><path d="M7 9V4h10v5"/><rect x="4" y="9" width="16" height="7" rx="1.5"/><path d="M7 14h10v6H7z"/></svg>Print or save as PDF</button>
   <hr>
@@ -99,9 +100,7 @@
       <button data-pressure="on">On</button><button data-pressure="off">Off — even lines</button>
     </div>
   </div>
-  <hr>
-  <button class="menu-item danger" data-act="newNotebook"><svg viewBox="0 0 24 24"><path d="M13.5 3H6v18h12V7.5z"/><path d="M13.5 3v4.5H18"/></svg>Start a new notebook</button>
-  <p class="note" style="margin:6px 10px 0">Your notebook saves automatically in this browser. Save to file to keep a copy or move it to another device.</p>
+  <p class="note" style="margin:6px 10px 0">Notebooks save automatically in this browser. To keep a copy or move them to another device, use Back up all on the Notebooks shelf.</p>
 </div>
 
 <!-- Present-mode mini toolbar -->
@@ -119,6 +118,49 @@
   <button class="btn" data-act="spread" title="Two pages (B)"><svg viewBox="0 0 24 24"><path d="M12 6.5C10 5 7 4.5 3 5v13.5c4-.5 7 0 9 1.5 2-1.5 5-2 9-1.5V5c-4-.5-7 0-9 1.5z"/><path d="M12 6.5V20"/></svg></button>
   <div class="sep"></div>
   <button class="btn" data-act="present" title="Stop presenting (Esc)"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+</div>
+
+<!-- Bookshelf: every notebook as an exercise-book cover -->
+<div id="shelf" aria-label="Your notebooks">
+  <header class="shelf-head">
+    <h2>Your notebooks</h2>
+    <div class="shelf-actions">
+      <button class="chip" data-shelf="backup" title="Save every notebook into one file"><svg viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5"/><path d="M5 19h14"/></svg>Back up all</button>
+      <button class="chip" data-shelf="import" title="Add a notebook file, or restore a backup"><svg viewBox="0 0 24 24"><path d="M12 15V4M7.5 8.5L12 4l4.5 4.5"/><path d="M5 19h14"/></svg>Open a file</button>
+      <button class="chip primary" id="shelfClose" data-shelf="close" title="Back to the open notebook (Esc)">Back to board</button>
+    </div>
+  </header>
+  <div class="shelf-banner" id="backupBanner" hidden>
+    <span>It's been a while since your notebooks were backed up. A backup is one file you can keep or move to another device.</span>
+    <span class="shelf-banner-actions"><button class="chip primary" data-shelf="backup">Back up now</button><button class="chip" data-shelf="snooze">Not now</button></span>
+  </div>
+  <div class="shelf-grid" id="shelfGrid"></div>
+  <footer class="shelf-foot" id="storageInfo"></footer>
+</div>
+
+<!-- Options for one notebook -->
+<div class="pop shelf-menu" id="nbMenu" role="menu">
+  <button class="menu-item" data-shelf="rename"><svg viewBox="0 0 24 24"><path d="M4 20l1-4.5L16 4.5l3.5 3.5L8.5 19z"/></svg>Rename and colour</button>
+  <button class="menu-item" data-shelf="duplicate"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5.5A1.5 1.5 0 0014.5 4h-9A1.5 1.5 0 004 5.5v9A1.5 1.5 0 005.5 16H8"/></svg>Make a copy</button>
+  <button class="menu-item" data-shelf="export"><svg viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5"/><path d="M5 19h14"/></svg>Save to a file</button>
+  <hr>
+  <button class="menu-item danger" data-shelf="delete"><svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9.5 7V4.5h5V7"/><path d="M6.5 7l1 13h9l1-13"/></svg>Delete</button>
+</div>
+
+<!-- New / rename notebook -->
+<div class="modal" id="nbDialog" role="dialog" aria-modal="true" aria-labelledby="nbDialogTitle">
+  <form class="card" id="nbForm" autocomplete="off">
+    <h3 id="nbDialogTitle">New notebook</h3>
+    <label class="field"><span class="row"><span>Name</span></span>
+      <input type="text" id="nbNameInput" maxlength="40" placeholder="e.g. Spelling, Novel study, Maths examples"></label>
+    <div class="lbl">Cover</div>
+    <div class="covers" id="nbColours"></div>
+    <div id="nbPaperBox">
+      <div class="lbl">Paper</div>
+      <div class="tpls" id="nbPaper"></div>
+    </div>
+    <div class="actions"><button type="button" class="chip" data-shelf="cancel">Cancel</button><button type="submit" class="chip primary" id="nbSubmit">Create</button></div>
+  </form>
 </div>
 
 <div id="toast" role="status"></div>

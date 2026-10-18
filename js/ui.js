@@ -1,12 +1,14 @@
 /* Toolbars, popovers, present mode, and the click / keyboard handlers. */
 import { PAGE_W, PEN_COLOURS, HL_COLOURS, TEMPLATES } from './config.js';
-import { state, page, makePage, visiblePages, hasInk } from './state.js';
-import { $, $$, toast } from './util.js';
+import { state, page, makePage, visiblePages } from './state.js';
+import { $, $$ } from './util.js';
 import { stage, layout, renderBgFor, hideEraser } from './board.js';
 import { drawTemplate } from './draw.js';
-import { scheduleSave, saveNow, saveFile, openFile, loadNotebook } from './storage.js';
+import { scheduleSave, saveNow } from './storage.js';
+import { saveNotebookFile } from './library.js';
+import { openShelf, shelfOpen, shelfEscape } from './shelf.js';
 import { undo, redo, clearVisible, canUndo, canRedo } from './history.js';
-import { goPage, stepPage, stepTarget, addPage, addPageAtEnd, deletePage, setTemplate, applyPaperToAll, toggleSpread, setBookStart } from './pages.js';
+import { stepPage, stepTarget, addPage, addPageAtEnd, deletePage, setTemplate, applyPaperToAll, toggleSpread, setBookStart } from './pages.js';
 import { exportPng, printAll } from './export.js';
 
 /* --- tools --- */
@@ -50,6 +52,17 @@ export function updatePageUI() {
   });
   $$('[data-act="clear"]').forEach(b => b.title = vis.length > 1 ? 'Clear both pages on screen (can be undone)' : 'Clear this page (can be undone)');
 }
+/* Refreshes everything after a notebook is opened (full) or renamed / recoloured. */
+export function showNotebook(full = true) {
+  const nb = state.nb;
+  $('#railNbTitle').textContent = nb ? nb.title : 'Notebooks';
+  $('#shelfBtn').title = nb ? `Notebook: ${nb.title} — tap to see all your notebooks` : 'Your notebooks';
+  document.documentElement.style.setProperty('--cover', nb ? nb.colour : '');
+  if (!full) return;
+  closePops();
+  stage.scrollTop = 0;
+  layout(); updatePageUI(); updateUndo(); updateViewBtns();
+}
 export function updateViewBtns() {
   $('#viewBtn span').textContent = state.view === 'page' ? 'Fit width' : 'Fit page';
   $$('[data-act="spread"]').forEach(b => b.classList.toggle('on', state.spread));
@@ -73,6 +86,15 @@ export const paperPopOpen = () => $('#paperPop').classList.contains('open');
 
 /* --- paper popover --- */
 const PREVIEW = { ruled: 14, thirds: 9, grid: 15 };
+/* A thumbnail of a paper type (exaggerated spacing so the pattern reads at this size). */
+export function drawPreview(c, tpl) {
+  const dpr = window.devicePixelRatio || 1, k = 56 / PAGE_W * dpr;
+  c.width = Math.round(56 * dpr); c.height = Math.round(79 * dpr);
+  const ctx = c.getContext('2d'); ctx.setTransform(k, 0, 0, k, 0, 0);
+  const fake = makePage(); fake.tpl = tpl;
+  fake.spacing = { ...PREVIEW }; fake.margin = { ruled: 34, thirds: 34, grid: 0 };
+  drawTemplate(ctx, fake, k);
+}
 export function renderPaperPop() {
   const pop = $('#paperPop'), pg = page(), t = pg.tpl, T = TEMPLATES[t];
   pop.innerHTML = `
@@ -87,15 +109,7 @@ export function renderPaperPop() {
       ${t === 'thirds' ? '<p class="note">Each row: solid top line, dotted middle line, solid base line, then a space for tails.</p>' : ''}`
       : '<p class="note">A plain page with no lines.</p>'}
     <button class="wide" data-act="applyAll">Use this paper on all pages</button>`;
-  // Mini previews (exaggerated spacing so the pattern reads at thumbnail size)
-  pop.querySelectorAll('[data-preview]').forEach(c => {
-    const dpr = window.devicePixelRatio || 1, k = 56 / PAGE_W * dpr;
-    c.width = Math.round(56 * dpr); c.height = Math.round(79 * dpr);
-    const ctx = c.getContext('2d'); ctx.setTransform(k, 0, 0, k, 0, 0);
-    const fake = makePage(); fake.tpl = c.dataset.preview;
-    fake.spacing = { ...PREVIEW }; fake.margin = { ruled: 34, thirds: 34, grid: 0 };
-    drawTemplate(ctx, fake, k);
-  });
+  pop.querySelectorAll('[data-preview]').forEach(c => drawPreview(c, c.dataset.preview));
   const sp = pop.querySelector('#spIn'), mg = pop.querySelector('#mgIn');
   if (sp) sp.oninput = () => { pg.spacing[t] = +sp.value; pop.querySelector('#spVal').textContent = sp.value + ' mm'; renderBgFor(pg); scheduleSave(); };
   if (mg) mg.oninput = () => { pg.margin[t] = +mg.value; pop.querySelector('#mgVal').textContent = +mg.value ? mg.value + ' mm' : 'None'; renderBgFor(pg); scheduleSave(); };
@@ -131,7 +145,8 @@ async function togglePresent() {
 
 /* --- one click handler for every button --- */
 function onClick(e) {
-  const b = e.target.closest('button'); if (!b) return;
+  const b = e.target.closest('button'); if (!b || b.closest('#shelf, #nbMenu, .modal')) return;
+  if (b.id === 'shelfBtn') return openShelf();
   if (b.dataset.tool) return setTool(b.dataset.tool);
   if (b.dataset.colour != null) {
     const i = +b.dataset.colour;
@@ -159,25 +174,20 @@ function onClick(e) {
     case 'spread': return toggleSpread();
     case 'view': state.view = state.view === 'page' ? 'width' : 'page'; updateViewBtns(); stage.scrollTop = 0; layout(); scheduleSave(); return;
     case 'present': return togglePresent();
-    case 'saveFile': closePops(); return saveFile();
-    case 'openFile': closePops(); return $('#fileInput').click();
+    case 'saveFile': closePops(); return saveNotebookFile();
     case 'png': closePops(); return exportPng();
     case 'print': return printAll();
-    case 'newNotebook':
-      closePops();
-      if (hasInk() && !confirm('Start a new notebook? The current one will be cleared from this browser (save it to file first to keep it).')) return;
-      loadNotebook(null); goPage(0, true); saveNow(); toast('New notebook started.');
-      return;
   }
 }
 
 /* --- keyboard --- */
 function onKey(e) {
+  if (shelfOpen()) { if (e.key === 'Escape') shelfEscape(); return; }
   if (e.target.tagName === 'INPUT') return;
   const ctrl = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
   if (ctrl && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if (ctrl && k === 'y') { e.preventDefault(); redo(); return; }
-  if (ctrl && k === 's') { e.preventDefault(); saveFile(); return; }
+  if (ctrl && k === 's') { e.preventDefault(); saveNotebookFile(); return; }
   if (ctrl || e.altKey) return;
   if (k === 'p') setTool('pen');
   else if (k === 'h') setTool('hl');
@@ -201,5 +211,4 @@ export function initUI() {
   });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveNow(); });
   document.addEventListener('selectstart', e => { if (e.target.tagName !== 'INPUT') e.preventDefault(); });
-  $('#fileInput').addEventListener('change', e => { const f = e.target.files[0]; if (f) openFile(f); e.target.value = ''; });
 }
