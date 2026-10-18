@@ -25,7 +25,7 @@ export function exportPng() {
   const idx = visiblePages();
   renderPagesCanvas(idx.map(i => state.pages[i]), 8).toBlob(b => {            // ~200 dpi
     if (!b) { toast("Couldn't create the image."); return; }
-    download(b, `workbook-${dateStr()}-p${idx.map(i => i + 1).join('-')}.png`);
+    download(b, `same-page-${dateStr()}-p${idx.map(i => i + 1).join('-')}.png`);
     toast(idx.length > 1 ? 'Pages saved as an image.' : 'Page saved as an image.');
   }, 'image/png');
 }

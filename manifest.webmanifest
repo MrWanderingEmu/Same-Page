@@ -1,6 +1,6 @@
 {
-  "name": "Workbook Board",
-  "short_name": "Workbook",
+  "name": "Same Page",
+  "short_name": "Same Page",
   "description": "A modelling whiteboard whose pages match student workbooks.",
   "start_url": "./",
   "scope": "./",

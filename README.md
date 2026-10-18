@@ -1,4 +1,4 @@
-# Workbook Board
+# Same Page
 
 A modelling whiteboard for teachers whose pages match the students' exercise books: A4 pages with ruled, dotted-thirds, grid or blank paper, at true millimetre spacing. Write with a stylus and what students see on the screen is exactly what's possible in their own books.
 

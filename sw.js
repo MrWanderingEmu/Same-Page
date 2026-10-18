@@ -1,7 +1,7 @@
 /* Service worker: lets the app open and run with no internet connection.
    Network first — you always get the latest version when online, and the
    cached copy when offline. If you add a new file, add it to FILES too. */
-const CACHE = 'workbook-board-v1';
+const CACHE = 'same-page-v1';
 const FILES = [
   './', 'index.html', 'css/styles.css', 'manifest.webmanifest', 'icon.svg',
   'js/main.js', 'js/util.js', 'js/config.js', 'js/state.js', 'js/storage.js', 'js/draw.js',

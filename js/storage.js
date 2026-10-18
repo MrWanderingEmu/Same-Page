@@ -10,7 +10,7 @@ export const db = {
   async open() {
     try {
       this.h = await new Promise((res, rej) => {
-        const r = indexedDB.open('workbook-board', 1);
+        const r = indexedDB.open('workbook-board', 1);     // original name, kept so existing saved work still loads
         r.onupgradeneeded = () => r.result.createObjectStore('kv');
         r.onsuccess = () => res(r.result);
         r.onerror = () => rej(r.error);
@@ -37,7 +37,8 @@ export const db = {
 
 export function serialise() {
   return {
-    app: 'workbook-board', version: 1, saved: new Date().toISOString(), cur: state.cur,
+    app: 'workbook-board', version: 1,                    // file tag kept from the original name so older files still open
+    saved: new Date().toISOString(), cur: state.cur,
     pages: state.pages.map(p => ({ tpl: p.tpl, spacing: { ...p.spacing }, margin: { ...p.margin }, strokes: p.strokes })),
   };
 }
@@ -77,7 +78,7 @@ export async function saveNow() {
 }
 
 export function saveFile() {
-  download(new Blob([JSON.stringify(serialise())], { type: 'application/json' }), `workbook-${dateStr()}.json`);
+  download(new Blob([JSON.stringify(serialise())], { type: 'application/json' }), `same-page-${dateStr()}.json`);
   toast('Notebook saved to your Downloads.');
 }
 export function openFile(file) {
@@ -85,7 +86,7 @@ export function openFile(file) {
   r.onload = () => {
     let data;
     try { data = JSON.parse(r.result); } catch (e) { toast("That file couldn't be read."); return; }
-    if (!data || data.app !== 'workbook-board') { toast("That doesn't look like a Workbook Board notebook."); return; }
+    if (!data || data.app !== 'workbook-board') { toast("That doesn't look like a Same Page notebook."); return; }
     if (hasInk() && !confirm('Open this notebook? It will replace the one on screen (save it to file first if you want to keep it).')) return;
     loadNotebook(data);
     goPage(state.cur, true);
