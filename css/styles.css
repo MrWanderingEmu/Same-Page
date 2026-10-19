@@ -85,6 +85,15 @@ input[type=text]{-webkit-user-select:text;user-select:text}
 #book.spread .sheet:nth-child(2) .gutter{display:block;left:0;
   background:linear-gradient(to right,rgba(70,55,25,.24),rgba(70,55,25,.1) 22%,rgba(70,55,25,.03) 60%,transparent)}
 
+/* reveal cover: a card over the bottom of the page, uncovered by its tab (cover.js) */
+.reveal{display:none;position:absolute;left:0;right:0;bottom:0;z-index:1;pointer-events:none;
+  background:linear-gradient(#ece5d3,#e4dcc7);border-top:1px solid #cfc3a8;box-shadow:0 -2px 7px rgba(40,30,10,.2)}
+.reveal.on{display:block}
+.reveal .tab{position:absolute;left:50%;top:-1px;transform:translateX(-50%);display:flex;align-items:center;gap:6px;
+  min-height:40px;padding:6px 18px 6px 14px;border-radius:0 0 14px 14px;background:#fff;color:var(--accent);
+  font-size:13px;font-weight:600;white-space:nowrap;box-shadow:0 2px 6px rgba(40,30,10,.18)}
+.reveal .tab svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+
 /* inside front cover (when page 1 sits on the right) */
 .sheet.cover{background:var(--inside-cover)}
 .sheet.cover canvas{display:none}

@@ -1,5 +1,5 @@
 /* App state, the page model, and which pages are on screen. */
-import { TEMPLATES } from './config.js';
+import { TEMPLATES, pageSize } from './config.js';
 import { clamp, uid } from './util.js';
 
 export const state = {
@@ -22,12 +22,13 @@ export const state = {
 };
 
 /* A new page, copying the paper (not the ink) of src if given.
-   land = the page is turned on its side (landscape). */
+   land = the page is turned on its side (landscape).
+   cover = where the reveal cover's top edge sits (mm from the top), or null for no cover. */
 const LINED = Object.keys(TEMPLATES).filter(k => TEMPLATES[k].spacing);
 export function makePage(src, id) {
   const p = {
     id: typeof id === 'string' && id ? id : uid(),
-    tpl: 'ruled', land: false,
+    tpl: 'ruled', land: false, cover: null,
     spacing: Object.fromEntries(LINED.map(k => [k, TEMPLATES[k].spacing.def])),
     margin:  Object.fromEntries(LINED.map(k => [k, TEMPLATES[k].margin])),
     strokes: [],
@@ -43,6 +44,8 @@ export function makePage(src, id) {
   }
   return p;
 }
+/* A saved cover position, checked: a number of mm down the page, or null. */
+export const cleanCover = (pg, v) => typeof v === 'number' && isFinite(v) ? clamp(v, 0, pageSize(pg)[1]) : null;
 export const page = () => state.pages[state.cur];
 export const hasInk = () => state.pages.some(p => p.strokes.length);
 

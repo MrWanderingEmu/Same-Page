@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Same Page smoke test</title>
+<!--
+  A quick check that the basics still work, run in the browser with no installs:
+  serve the repo (python -m http.server 5173) and open http://localhost:5173/tests/smoke.html.
+  It loads the app with ?test, which uses a blank notebook in memory, so saved notebooks are
+  never touched. It draws, erases, undoes, changes paper, uses the ruler and the reveal cover
+  with simulated pen input, and fails if anything throws an error.
+  Results are also left in window.__results (and window.__done = true) for automated runs.
+-->
+<style>
+  body{margin:0;font:14px/1.4 "Segoe UI",system-ui,sans-serif;background:#faf8f4;color:#26231e}
+  header{padding:14px 18px;display:flex;align-items:center;gap:14px;border-bottom:1px solid #dcd6ca}
+  h1{font-size:17px;margin:0}
+  #summary{font-weight:600}
+  #summary.pass{color:#1d8a43} #summary.fail{color:#bf3a3a}
+  main{display:flex;gap:18px;padding:18px;align-items:flex-start;flex-wrap:wrap}
+  ol{margin:0;padding-left:22px;min-width:320px;max-width:520px}
+  li{margin:0 0 6px} li.pass::marker{color:#1d8a43} li.fail{color:#bf3a3a}
+  li small{display:block;color:#766f63}
+  iframe{width:1280px;height:720px;border:1px solid #dcd6ca;background:#fff;transform:scale(.5);transform-origin:0 0;margin-bottom:-360px;margin-right:-640px}
+</style>
+</head>
+<body>
+<header><h1>Same Page smoke test</h1><span id="summary">Running…</span></header>
+<main><ol id="list"></ol><iframe id="app" src="../index.html?test"></iframe></main>
+<script type="module">
+const frame = document.getElementById('app'), list = document.getElementById('list');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const results = window.__results = [];
+let w, d, wb, errors = [];
+
+function report(name, ok, detail = '') {
+  results.push({ name, ok, detail });
+  const li = document.createElement('li');
+  li.className = ok ? 'pass' : 'fail';
+  li.innerHTML = `${ok ? '✓' : '✗'} ${name}${detail ? `<small>${detail}</small>` : ''}`;
+  list.append(li);
+}
+async function test(name, fn) {
+  const before = errors.length;
+  try {
+    const detail = await fn();
+    const errs = errors.slice(before);
+    report(name, !errs.length, errs.length ? 'Error: ' + errs.join(' | ') : detail || '');
+  } catch (e) { report(name, false, e.message); }
+}
+const check = (cond, msg) => { if (!cond) throw new Error(msg); };
+
+/* --- driving the app --- */
+const stage = () => d.querySelector('#stage');
+const sheetEl = (i = 0) => d.querySelectorAll('.sheet')[i];
+const pageW = () => wb.page().land ? 297 : 210;
+const k = () => sheetEl().getBoundingClientRect().width / pageW();
+const toClient = ([x, y]) => { const r = sheetEl().getBoundingClientRect(); return [r.left + x * k(), r.top + y * k()]; };
+function ev(type, [x, y], o = {}) {
+  stage().dispatchEvent(new w.PointerEvent(type, { bubbles: true, cancelable: true, pointerId: o.id || 2, pointerType: o.pt || 'pen',
+    clientX: x, clientY: y, buttons: type === 'pointerup' ? 0 : (o.buttons ?? 1), button: o.button ?? 0, pressure: 0.5 }));
+}
+/* A stroke through points given in page mm. */
+function stroke(mm, o) {
+  const pts = mm.map(toClient);
+  ev('pointerdown', pts[0], o); pts.slice(1).forEach(p => ev('pointermove', p, o)); ev('pointerup', pts[pts.length - 1], o);
+}
+const squiggle = (x, y) => [[x, y], [x + 2, y + 4], [x + 4, y], [x + 6, y + 4]];
+const tap = (sel) => d.querySelector(sel).click();
+const strokes = () => wb.page().strokes.length;
+function inkPixels(cls = 'ink') {
+  const c = sheetEl().querySelector('canvas.' + cls), px = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+  let n = 0; for (let i = 3; i < px.length; i += 4) if (px[i] > 60) n++;
+  return n;
+}
+function bgMarks() {   // pixels on the paper that aren't white
+  const c = sheetEl().querySelector('canvas.bg'), px = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+  let n = 0; for (let i = 0; i < px.length; i += 4) if (px[i] < 240 || px[i + 1] < 240 || px[i + 2] < 240) n++;
+  return n;
+}
+function fresh() { wb.page().strokes = []; wb.layout(); }
+
+/* --- the tests --- */
+async function run() {
+  await test('App starts on a blank in-memory notebook', async () => {
+    for (let i = 0; i < 100 && !(w.__wb && w.__wb.state.pages.length); i++) await sleep(50);
+    wb = w.__wb;
+    check(wb && wb.state.pages.length === 1, 'the app did not start');
+    check(wb.state.tool === 'pen', `tool is ${wb.state.tool}, expected pen`);
+  });
+  if (!wb) return;
+
+  await test('Pen writes', () => {
+    fresh();
+    for (let i = 0; i < 5; i++) stroke(squiggle(40 + i * 12, 40));
+    check(strokes() === 5, `${strokes()} strokes, expected 5`);
+    check(inkPixels() > 0, 'nothing drawn on screen');
+  });
+
+  await test('Stylus eraser rubs out only what it touches, and the rest stays on screen', () => {
+    const before = inkPixels();
+    stroke([[64, 42], [66, 42]], { buttons: 32, button: 5 });
+    check(strokes() === 4, `${strokes()} strokes left, expected 4`);
+    const after = inkPixels();
+    check(after > before * 0.5, `page looks blank (${after} of ${before} ink pixels left)`);
+  });
+
+  await test('Eraser tool works too', () => {
+    tap('.rail [data-tool="eraser"]');
+    stroke([[76, 42], [78, 42]]);
+    tap('.rail [data-tool="pen"]');
+    check(strokes() === 3, `${strokes()} strokes left, expected 3`);
+    check(inkPixels() > 0, 'page looks blank');
+  });
+
+  await test('Undo and redo', () => {
+    wb.undo(); check(strokes() === 4, `after undo: ${strokes()}`);
+    wb.undo(); check(strokes() === 5, `after second undo: ${strokes()}`);
+    wb.redo(); check(strokes() === 4, `after redo: ${strokes()}`);
+  });
+
+  await test('Clear, then undo brings it back', () => {
+    tap('.rail [data-act="clear"]'); check(strokes() === 0, 'page not cleared');
+    wb.undo(); check(strokes() === 4, `after undo: ${strokes()}`);
+    check(inkPixels() > 0, 'ink not redrawn');
+  });
+
+  await test('Every paper type draws', () => {
+    const blank = [];
+    for (const t of ['ruled', 'thirds', 'thirds2', 'sky', 'grid']) { wb.setTemplate(t); if (!bgMarks()) blank.push(t); }
+    wb.setTemplate('ruled');
+    check(!blank.length, 'no lines drawn for: ' + blank.join(', '));
+  });
+
+  await test('Landscape and back', async () => {
+    tap('#paperBtn'); tap('[data-orient="land"]');
+    let r = sheetEl().getBoundingClientRect();
+    check(wb.page().land && r.width > r.height, `landscape page is ${Math.round(r.width)} × ${Math.round(r.height)}`);
+    tap('[data-orient="port"]'); tap('#paperBtn');
+    r = sheetEl().getBoundingClientRect();
+    check(!wb.page().land && r.width < r.height, `portrait page is ${Math.round(r.width)} × ${Math.round(r.height)}`);
+  });
+
+  await test('Adding and turning pages', () => {
+    wb.addPage();
+    check(wb.state.pages.length === 2 && wb.state.cur === 1, 'no new page');
+    check(strokes() === 0, 'new page is not empty');
+    wb.goPage(0);
+    check(strokes() === 4 && inkPixels() > 0, 'page 1 ink missing after turning back');
+  });
+
+  await test('Two-page view', () => {
+    wb.toggleSpread();
+    check(d.querySelector('#book').classList.contains('spread'), 'not in two-page view');
+    wb.toggleSpread();
+  });
+
+  await test('Venn tapped in the bottom half fills the bottom half', () => {
+    fresh();
+    tap('.rail [data-act="insert"]'); tap('[data-insert="venn2"]');
+    stroke([[105, 230]]);
+    const ys = wb.page().strokes.flatMap(s => s.p.filter((_, i) => i % 3 === 1));
+    check(ys.length && Math.min(...ys) > 297 / 2, `Venn spans ${Math.round(Math.min(...ys))}–${Math.round(Math.max(...ys))} mm`);
+    check(wb.state.tool === 'pen', 'tool did not go back to the pen');
+  });
+
+  await test('Ruler rules a wobbly stroke straight', () => {
+    fresh();
+    tap('.rail [data-act="ruler"]');
+    const top = d.querySelector('#ruler').getBoundingClientRect().top, r = sheetEl().getBoundingClientRect();
+    const y = (top - r.top) / k() - 2;
+    stroke(Array.from({ length: 20 }, (_, i) => [40 + i * 4, y + Math.sin(i) * 2.5]));
+    tap('.rail [data-act="ruler"]');
+    const s = wb.page().strokes[0], ys = s ? s.p.filter((_, i) => i % 3 === 1) : [];
+    check(ys.length > 1 && Math.max(...ys) - Math.min(...ys) < 0.05, 'stroke is not straight');
+  });
+
+  await test('Reveal cover hides, protects and uncovers line by line', async () => {
+    fresh();
+    for (let row = 0; row < 6; row++) stroke(squiggle(40, 26 + row * 8));
+    tap('[data-act="cover"]');
+    const pg = wb.page(), start = pg.cover;
+    check(start != null, 'no cover after pressing Cover');
+    check(d.querySelector('.sheet .reveal').classList.contains('on'), 'cover not shown');
+    const n = strokes();
+    stroke(squiggle(120, 200));                                            // pen on the cover
+    check(strokes() === n, 'the pen wrote on the cover');
+    stroke([[40, 200], [80, 200], [42, 66]], { buttons: 32, button: 5 });  // eraser on the cover
+    check(strokes() === n, 'the eraser rubbed out covered work');
+    const tabAt = () => { const t = d.querySelector('.sheet .reveal .tab').getBoundingClientRect(); return [t.left + t.width / 2, t.top + t.height / 2]; };
+    let p = tabAt(); ev('pointerdown', p); ev('pointerup', p);
+    check(pg.cover > start, `tap did not uncover (${start} → ${pg.cover})`);
+    const one = pg.cover;
+    p = tabAt(); ev('pointerdown', p); ev('pointermove', [p[0], p[1] + 25 * k()]); ev('pointerup', [p[0], p[1] + 25 * k()]);
+    const step = (pg.cover - start) / 8;                                    // ruled 8 mm: stops are one line apart
+    check(pg.cover > one + 15 && Math.abs(step - Math.round(step)) < 0.01, `drag did not settle on a line (${pg.cover.toFixed(2)} mm)`);
+    tap('[data-act="cover"]');
+    check(pg.cover == null && !d.querySelector('.sheet .reveal').classList.contains('on'), 'Cover did not come off');
+  });
+
+  await test('No errors in the console', () => { check(!errors.length, errors.join(' | ')); });
+}
+
+frame.addEventListener('load', async () => {
+  w = frame.contentWindow; d = frame.contentDocument;
+  w.addEventListener('error', e => errors.push(e.message));
+  w.addEventListener('unhandledrejection', e => errors.push(String(e.reason)));
+  const ce = w.console.error.bind(w.console);
+  w.console.error = (...a) => { errors.push(a.map(String).join(' ')); ce(...a); };
+  await run();
+  const failed = results.filter(r => !r.ok).length, s = document.getElementById('summary');
+  s.textContent = failed ? `${failed} of ${results.length} failed` : `All ${results.length} passed`;
+  s.className = failed ? 'fail' : 'pass';
+  window.__done = true;
+});
+</script>
+</body>
+</html>

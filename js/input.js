@@ -7,7 +7,8 @@
    - Insert tool: drag a box to place a shape or organiser (or tap to use its default size).
    - Double-tap a page (pen or finger) to switch between one page and two.
    - Select tool (select.js), laser pointer (laser.js) and ruler (ruler.js) get their gestures from here too.
-   - A pen or highlighter stroke started along the ruler's edge is ruled straight. */
+   - A pen or highlighter stroke started along the ruler's edge is ruled straight.
+   - Reveal cover (cover.js): its tab is dragged or tapped from here; nothing else happens on the cover. */
 import { PEN_COLOURS, HL_COLOURS, PEN_SIZES, HL_SIZES, ERASER_SIZES, HL_ALPHA } from './config.js';
 import { state } from './state.js';
 import { stage, view, sheets, sheetAt, clearLive, renderInkFor, showEraser, hideEraser } from './board.js';
@@ -20,6 +21,7 @@ import { recognise, densify, insertById, placeItem, tapBox } from './shapes.js';
 import { selDown, selMove, selUp } from './select.js';
 import { laserDown, laserMove, laserUp, showDot, hideDot } from './laser.js';
 import { rulerHit, ruledPoint, rulerDown, rulerMove, rulerUp } from './ruler.js';
+import { coverTabAt, coverDown, coverMove, coverUp, isCovered, coveredHint } from './cover.js';
 
 let active = null;          // the current gesture
 let lastPen = -1e9;         // time of the last pen event (hover counts)
@@ -58,6 +60,12 @@ function onDown(e) {
     active = { id: e.pointerId, ptype: e.pointerType, kind: 'ruler', g: rulerDown(rh, e.clientX, e.clientY) };
     return;
   }
+  const tab = !rh && coverTabAt(e.clientX, e.clientY);
+  if (tab) {                                                               // drag or tap the reveal cover's tab
+    e.preventDefault(); closePops(); capture(e.pointerId);
+    active = { id: e.pointerId, ptype: e.pointerType, kind: 'cover', g: coverDown(tab, e.clientY) };
+    return;
+  }
   if (e.pointerType === 'touch') {
     if (touchMode() === 'scroll') {
       active = { id: e.pointerId, ptype: 'touch', kind: 'pan', x: e.clientX, y: e.clientY, st: stage.scrollTop, sl: stage.scrollLeft, t0: now };
@@ -77,6 +85,7 @@ function onDown(e) {
     showDot(e.clientX, e.clientY);
     return;
   }
+  if (isCovered(state.pages[sheet.pi], toPage(e, rect)[1])) { coveredHint(); return; }   // hidden work stays untouched
   setActive(sheet.pi);
   if (state.tool === 'select' && !wantsEraser(e)) {
     active = { id: e.pointerId, ptype: e.pointerType, kind: 'select', rect, g: selDown(sheet, toPage(e, rect)) };
@@ -97,6 +106,7 @@ function onMove(e) {
   if (e.pointerType === 'pen') lastPen = performance.now();
   if (!active || e.pointerId !== active.id) { hoverCursor(e); return; }
   if (active.kind === 'ruler') { rulerMove(active.g, e.clientX, e.clientY); return; }
+  if (active.kind === 'cover') { coverMove(active.g, e.clientY); return; }
   if (active.kind === 'pan') {
     stage.scrollTop = active.st - (e.clientY - active.y);
     stage.scrollLeft = active.sl - (e.clientX - active.x);
@@ -133,6 +143,7 @@ function onEnd(e) {
   clearTimeout(a.holdTimer);
   const now = performance.now();
   if (a.kind === 'ruler') { rulerUp(a.g); return; }
+  if (a.kind === 'cover') { coverUp(a.g); return; }
   if (a.kind === 'pan') {
     // Swipe left/right to change page (or spread) when the page isn't scrollable.
     const dx = e.clientX - a.x, dy = e.clientY - a.y;
@@ -320,7 +331,9 @@ function eraseAlong(cx, cy) {
     const sheet = sheetAt(x, a.rects);
     if (sheet.kind !== 'page') continue;
     const pg = state.pages[sheet.pi], rect = a.rects[sheets.indexOf(sheet)], before = pg.strokes;
-    if (eraseAt(pg, (x - rect.left) / view.scale, (y - rect.top) / view.scale, r)) {
+    const mx = (x - rect.left) / view.scale, my = (y - rect.top) / view.scale;
+    if (isCovered(pg, my)) continue;
+    if (eraseAt(pg, mx, my, r)) {
       if (!a.before.has(pg)) a.before.set(pg, before);
       touched.add(pg);
     }

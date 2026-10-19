@@ -21,6 +21,7 @@ Same Page is a stylus whiteboard for teachers whose pages match the students' ex
 | `ac863b3` | **Hold-to-snap shapes**, the **Insert** tool (6 shapes and 11 graphic organisers) and **double-tap** to switch between one and two pages. Also fixed a nearly invisible page counter |
 | `f37c984` | **Lasso Select** (move, resize, recolour, duplicate, delete) and the **laser pointer** |
 | `4998812` | After the first classroom test (19 Oct): **eraser fix**, **landscape pages**, **two-dotted** and **sky-grass-dirt** thirds, **Venn fills the half you tap**, **ruler** (details below) |
+| *(19 Oct, later)* | **Reveal cover** and the **smoke test** page (details below) |
 
 ## First classroom test (19 Oct 2026) and what changed
 
@@ -31,6 +32,16 @@ The teacher used it with a class on the Lifebook with a stylus, and preferred it
 - **Two new thirds papers** (colleague request): `thirds2`, which is solid, dotted, dotted, solid with rows touching, and `sky`, the same rows coloured sky, grass and dirt for early writers. The sky paper has no margin by default.
 - **Venn placement:** tapping with Venn or Venn × 3 fills the top or bottom half of the page, whichever was tapped (`fit: 'half'` in `shapes.js`). Other organisers still fill the page.
 - **Ruler** (colleague request, for modelling ruling up a margin): `ruler.js`. It is drawn in a fixed layer over the stage, so it can hang off the page without making it scroll. Input does the hit-testing: body = move, knob = turn (tap = level ↔ upright), within 7 mm outside / 3 mm inside a long edge = a ruled pen or highlighter stroke. The eraser and laser pass straight through it. Its position isn't saved.
+
+## Reveal cover (19 Oct 2026)
+
+The teacher picked this next. Their choices: prepared ahead and saved with the page (not a lesson-only overlay); one sheet sliding down from the top (not tap-away boxes); snapping to the paper's lines; revealed by pen or finger (no clicker).
+
+- `pg.cover` is the cover's top edge in mm, or `null`. It's saved in page records and notebook files, but isn't part of the paper, so new pages and *Use this paper on all pages* don't copy it. It isn't in Undo either, like the laser.
+- `coverStops(pg)` in `cover.js` gives where it can rest. Ruled: 0.3 of a line gap under each line, leaving room for tails. Thirds: a whole row at a time, just above the next head line. Two dotted and sky: just under each row's bottom line. Grid: each line. Blank: every 10 mm. The first stop shows only the heading area.
+- Tap the tab = next stop (the last one takes it off). Drag = settles on the nearest stop, or comes off if pulled to the bottom. Only the tab moves it; pointer-down on the covered area does nothing (one hint toast), and the eraser skips covered points.
+- The card is a DOM element inside each sheet, so it follows the page; exports draw the canvases only, so it never prints.
+- Known gap: a Select lasso started above the cover can still pick up strokes under it.
 
 The features themselves, and the keyboard shortcuts, are described in [README.md](README.md).
 
@@ -52,12 +63,15 @@ The features themselves, and the keyboard shortcuts, are described in [README.md
 - **New files:** if you add a file, add it to the `FILES` list in `sw.js` and bump `CACHE` (it's at `same-page-v5` now), or it won't work offline.
 - **Storage changes:** if the database layout changes, bump the version in `db.open()` in `js/storage.js` and handle the upgrade. Existing notebooks must keep loading.
 - **Simulating pen input in the browser preview:** the hidden preview pane gives the page zero size and slows animation to about 2 frames a second. Set a window size (e.g. 1280 × 720) first, and don't judge animation timing (like the laser fade) there. Screenshots of a 1280 × 720 window may come back cropped; copying the page canvases into one scaled-down image overlay is a reliable way to see the whole page.
+- **Run the smoke test before pushing:** <http://localhost:5173/tests/smoke.html> (see the README). It would have caught the eraser bug, and it does if that bug is put back. Add a check to it whenever a feature is added. It runs the app with `?test`, which skips IndexedDB, so it's safe to run anywhere.
+- **Toolbar room:** at 1280 × 720 the left rail is exactly full; the right rail has about 60 px spare. A new left-rail button needs something else to move.
 - **Check the console after testing.** The eraser bug threw an error on every erase, but the page looked fine in a quick synthetic test. Read the console's error messages after any input test.
 
 ## Not yet tested or known gaps
 
 - **Real stylus:** writing has been used in a lesson and works well. Not yet confirmed on the device:
   - the eraser fix (stylus eraser end and the Eraser button)
+  - the reveal cover's tab: big enough, and not grabbed by accident
   - the ruler: how easily a stroke catches its edge (7 mm outside / 3 mm inside), and whether the pen moves it by accident
   - hold-to-snap: `HOLD_MS` = 450 ms
   - double-tap: `DOUBLE_MS` = 350 ms, 2.5 mm apart
@@ -67,6 +81,7 @@ The features themselves, and the keyboard shortcuts, are described in [README.md
 - **Snapped ovals** are always level (never tilted). A tilted four-sided shape keeps its angle and gets straight edges.
 - **No sync:** notebooks live in one browser on one device. Moving them means *Back up all* and then *Open a file* on the other device.
 - **No pinch-to-zoom**, and no automated tests yet.
+- **Reveal cover:** not yet tried with the stylus in a lesson; the tab is 40 px tall.
 - **Ruler:** turns only by its knob (no two-finger twist), and its position resets each time it's shown.
 - **Landscape preview in the new-notebook dialog:** new notebooks always start portrait; turn a page to landscape and use *Use this paper on all pages*.
 
@@ -78,11 +93,10 @@ The features themselves, and the keyboard shortcuts, are described in [README.md
    - store each image only once (matched by its content)
    - pages refer to images rather than holding copies
    - once images are placed, they move and resize with Select
-3. **Reveal cover:** a sheet over the page that slides down to uncover a worked example step by step.
-4. **Writing replay:** replay a page stroke by stroke to show letter formation or the order of a method. Stroke order is already stored.
-5. **Page overview:** thumbnails of every page, to jump to one or drag to reorder.
-6. **Protractor** overlay for modelling angles (the ruler is done). Maybe two-finger twist to turn the ruler.
-7. **Quick notebook switcher** in the toolbar. It was offered alongside the shelf, but the teacher chose the shelf only.
-8. **Linked OneDrive folder:** save notebooks as files in a synced folder, for backup and school ↔ home use. This works in Chrome and Edge only.
-9. **Copy and paste between pages and notebooks;** drag a selection across the spine.
-10. **Automated tests** (e.g. Playwright) for shape recognition, storage migration and backup/restore. Even a short smoke test (draw, erase, undo, turn the page, with no console errors) would have caught the eraser bug before a lesson.
+3. **Writing replay:** replay a page stroke by stroke to show letter formation or the order of a method. Stroke order is already stored.
+4. **Page overview:** thumbnails of every page, to jump to one or drag to reorder.
+5. **Protractor** overlay for modelling angles (the ruler is done). Maybe two-finger twist to turn the ruler.
+6. **Quick notebook switcher** in the toolbar. It was offered alongside the shelf, but the teacher chose the shelf only.
+7. **Linked OneDrive folder:** save notebooks as files in a synced folder, for backup and school ↔ home use. This works in Chrome and Edge only.
+8. **Copy and paste between pages and notebooks;** drag a selection across the spine.
+9. **More automated tests:** the smoke test covers the basics; still untested are shape recognition, storage migration, and backup/restore.

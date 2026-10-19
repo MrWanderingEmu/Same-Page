@@ -68,7 +68,7 @@ export async function deleteNotebook(id) {
 function notebookJson(meta, pages) {
   const { id, title, colour, created, updated, cur, spread, bookStart, view } = meta;
   return { id, title, colour, created, updated, cur, spread, bookStart, view,
-    pages: pages.map(p => ({ tpl: p.tpl, land: !!p.land, spacing: { ...p.spacing }, margin: { ...p.margin }, strokes: p.strokes })) };
+    pages: pages.map(p => ({ tpl: p.tpl, land: !!p.land, cover: p.cover, spacing: { ...p.spacing }, margin: { ...p.margin }, strokes: p.strokes })) };
 }
 async function loadForFile(id) {
   if (state.nb && state.nb.id === id) return notebookJson(metaRecord(), state.pages);

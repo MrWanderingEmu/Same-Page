@@ -9,6 +9,7 @@ A modelling whiteboard for teachers whose pages match the students' exercise boo
 - **Insert** shapes (line, arrow, rectangle, circle, triangles) and graphic organisers (T-chart, Venn, three-circle Venn, Y-chart, three columns, Frayer model, 2 × 2 grid, story mountain, mind map, number line, sequence). Drag a box to place one, or tap to fill the page (a Venn fills the top or bottom half, whichever you tap). They're drawn in pen ink, so Undo and the eraser work on them.
 - **Ruler** (**R**): a see-through 30 cm ruler at true size. Start a pen or highlighter stroke along either long edge and it comes out dead straight, for modelling ruling up a margin or underlining. Drag the ruler to move it; drag the round knob to turn it (it clicks to level, upright and 45°), or tap the knob to swap between level and upright.
 - **Select:** draw a loop round anything (or tap one line) to select it, then drag to move it, drag the corner handle to resize, tap a colour to recolour, or use *Duplicate* / *Delete*.
+- **Reveal cover:** *Cover* (right toolbar) lays a card over the page below the heading. Drag its tab to where the reveal should start; in class, tap the tab to uncover one line (or one row of thirds) at a time, or drag it to uncover several or hide them again. It always settles on a line. The cover is saved with the page, so a worked example can be prepared ahead. The pen and eraser do nothing on the covered part, and saved images and prints leave the cover off.
 - **Laser pointer:** a glowing red dot follows the pen, and anything you draw with it fades away a moment later. Nothing is saved.
 - **Double-tap a page** (pen or finger) to focus on it from two-page view; double-tap again to see both pages.
 - **Paper per page:** portrait or landscape, line spacing, margin, and paper type: ruled, dotted thirds (solid, dotted, solid, then a space for tails), two-dotted thirds (solid, dotted, dotted, solid), sky-grass-dirt (coloured bands for early writers), grid or blank. *Use this paper on all pages* copies it to every page. Landscape pages print sideways on A4.
@@ -66,6 +67,7 @@ js/shapes.js          recognising drawn shapes; geometry for every shape and org
 js/select.js          lasso selection: move, resize, recolour, duplicate, delete
 js/laser.js           laser pointer trails and dot
 js/ruler.js           the ruler: moving and turning it, ruling strokes along its edge
+js/cover.js           the reveal cover: where it can stop on each paper, its tab
 js/history.js         undo / redo across the whole notebook
 js/pages.js           navigating, adding, deleting pages; paper settings
 js/export.js          image export and print / PDF
@@ -74,7 +76,12 @@ js/shelf.js           the Notebooks shelf screen
 js/ui.js              toolbars, popovers, present mode, keyboard
 sw.js                 offline support (add any new file to its FILES list)
 manifest.webmanifest  install-as-app details
+tests/smoke.html      quick in-browser check of the basics (see below)
 ```
+
+## Smoke test
+
+With the server running, open <http://localhost:5173/tests/smoke.html>. It loads the app with `?test` (a blank notebook in memory, so saved notebooks are never touched), then writes, erases, undoes, clears, changes paper and orientation, turns pages, places a Venn, rules a line and uses the reveal cover with simulated pen input. It fails on any wrong result or console error. Run it before pushing; it takes a few seconds.
 
 Browser storage holds four stores: `notebooks` (one small record each), `pages` (one record per page, ink stored compactly as whole hundredths of a millimetre), `assets` (reserved for images) and `kv` (settings). Notebook and backup files are plain JSON; single-notebook files can still be opened by the first version of the app.
 

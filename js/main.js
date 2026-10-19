@@ -15,7 +15,9 @@ import { initInput } from './input.js';
   initUI();
   initShelf();
   initInput();
-  if (await db.open()) {
+  // ?test (used by tests/smoke.html) runs on a blank in-memory notebook and never touches saved work.
+  const testing = new URLSearchParams(location.search).has('test');
+  if (!testing && await db.open()) {
     await migrate();
     applyPrefs(await kvGet('prefs'));
     const last = await kvGet('lastOpen');
@@ -32,7 +34,7 @@ import { initInput } from './input.js';
     state.nb = { id: 'temp', title: 'My notebook', colour: COVER_COLOURS[0], created: Date.now(), updated: Date.now() };
     state.pages = [makePage()];
     showNotebook();
-    toast("Auto-save isn't available here — use More › Save this notebook to a file.");
+    if (!testing) toast("Auto-save isn't available here — use More › Save this notebook to a file.");
   }
   renderTools();
   new ResizeObserver(() => requestAnimationFrame(layout)).observe(stage);

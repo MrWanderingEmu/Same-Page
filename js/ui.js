@@ -14,6 +14,7 @@ import { INSERTS, placeItem } from './shapes.js';
 import { hasSelection, clearSelection, deleteSelection, duplicateSelection, recolourSelection } from './select.js';
 import { hideDot } from './laser.js';
 import { toggleRuler } from './ruler.js';
+import { toggleCover, renderCovers } from './cover.js';
 
 /* --- tools --- */
 export function buildSwatches() {
@@ -90,6 +91,7 @@ export function updatePageUI() {
     b.title = `Delete page ${state.cur + 1}`;
   });
   $$('[data-act="clear"]').forEach(b => b.title = vis.length > 1 ? 'Clear both pages on screen (can be undone)' : 'Clear this page (can be undone)');
+  renderCovers();
 }
 /* Refreshes everything after a notebook is opened (full) or renamed / recoloured. */
 export function showNotebook(full = true) {
@@ -230,6 +232,7 @@ function onClick(e) {
     case 'applyAll': return applyPaperToAll();
     case 'spread': return toggleSpread();
     case 'ruler': return toggleRuler();
+    case 'cover': return toggleCover();
     case 'view': state.view = state.view === 'page' ? 'width' : 'page'; updateViewBtns(); stage.scrollTop = 0; layout(); scheduleSave(); return;
     case 'present': return togglePresent();
     case 'saveFile': closePops(); return saveNotebookFile();
