@@ -21,7 +21,7 @@ Same Page is a stylus whiteboard for teachers whose pages match the students' ex
 | `ac863b3` | **Hold-to-snap shapes**, the **Insert** tool (6 shapes and 11 graphic organisers) and **double-tap** to switch between one and two pages. Also fixed a nearly invisible page counter |
 | `f37c984` | **Lasso Select** (move, resize, recolour, duplicate, delete) and the **laser pointer** |
 | `4998812` | After the first classroom test (19 Oct): **eraser fix**, **landscape pages**, **two-dotted** and **sky-grass-dirt** thirds, **Venn fills the half you tap**, **ruler** (details below) |
-| *(19 Oct, later)* | **Reveal cover** and the **smoke test** page (details below) |
+| `e22bfe4` | **Reveal cover** and the **smoke test** page (details below) |
 
 ## First classroom test (19 Oct 2026) and what changed
 
@@ -81,13 +81,14 @@ The features themselves, and the keyboard shortcuts, are described in [README.md
 - **Snapped ovals** are always level (never tilted). A tilted four-sided shape keeps its angle and gets straight edges.
 - **No sync:** notebooks live in one browser on one device. Moving them means *Back up all* and then *Open a file* on the other device.
 - **No pinch-to-zoom**, and no automated tests yet.
-- **Reveal cover:** not yet tried with the stylus in a lesson; the tab is 40 px tall.
+- **Quick stylus check (evening of 19 Oct):** after the reveal cover went live, the teacher tried the new features with the stylus: "feels great". More detailed feedback is due on 20 Oct; start the next session by asking for it before building anything new.
+- **Reveal cover:** not yet used in a lesson; the tab is 40 px tall.
 - **Ruler:** turns only by its knob (no two-finger twist), and its position resets each time it's shown.
 - **Landscape preview in the new-notebook dialog:** new notebooks always start portrait; turn a page to landscape and use *Use this paper on all pages*.
 
 ## Possible next steps (rough priority)
 
-1. **Use it in class again with the stylus:** check the eraser fix and the ruler, and tune the timings above from real use.
+1. **Act on the teacher's detailed feedback (due 20 Oct)** from using the eraser fix, ruler and reveal cover with the stylus, and tune the timings above from real use.
 2. **Insert and paste images.** This has been asked for. Storage already has an empty `assets` space for it. The agreed plan:
    - shrink photos to about 200–400 KB each
    - store each image only once (matched by its content)
