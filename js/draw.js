@@ -1,43 +1,60 @@
 /* Pure drawing: paper templates and ink strokes onto any 2D context already scaled to millimetres.
    Used for the screen, the page thumbnails and the exports. */
-import { PAGE_W, PAGE_H, TOP_GAP, LINE_COL, HL_ALPHA } from './config.js';
+import { pageSize, TOP_GAP, LINE_COL, HL_ALPHA } from './config.js';
 
 /* Draws a page's paper onto ctx. k = device pixels per mm. */
 export function drawTemplate(ctx, pg, k) {
+  const [W, H] = pageSize(pg);
   ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, PAGE_W, PAGE_H);
+  ctx.fillRect(0, 0, W, H);
   const t = pg.tpl;
   if (t === 'blank') return;
   const sp = pg.spacing[t], m = pg.margin[t] || 0;
   const hair = Math.max(0.2, 1 / k);                         // never thinner than 1 device pixel
   const snap = v => (Math.round(v * k - 0.5) + 0.5) / k;     // crisp 1px lines
-  const hline = (y, x0 = 0, x1 = PAGE_W) => { const yy = snap(y); ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); };
+  const hline = (y, x0 = 0, x1 = W) => { const yy = snap(y); ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); };
+  const dotted = (ys, col, w) => {
+    ctx.strokeStyle = col; ctx.lineWidth = w; ctx.setLineDash([0.9, 1.3]); ctx.beginPath();
+    ys.forEach(y => hline(y)); ctx.stroke(); ctx.setLineDash([]);
+  };
 
   ctx.lineCap = 'butt';
   if (t === 'ruled') {
     ctx.strokeStyle = LINE_COL.ruled; ctx.lineWidth = hair; ctx.beginPath();
-    for (let y = TOP_GAP; y <= PAGE_H - 6; y += sp) hline(y);
+    for (let y = TOP_GAP; y <= H - 6; y += sp) hline(y);
     ctx.stroke();
   } else if (t === 'thirds') {
     // Dotted thirds: solid head line, dotted middle line, solid base line, then a descender third.
     const rows = [];
-    for (let y = TOP_GAP; y + 2 * sp <= PAGE_H - 6; y += 3 * sp) rows.push(y);
+    for (let y = TOP_GAP; y + 2 * sp <= H - 6; y += 3 * sp) rows.push(y);
     ctx.strokeStyle = LINE_COL.base; ctx.lineWidth = hair; ctx.beginPath();
     rows.forEach(y => hline(y)); ctx.stroke();
     ctx.strokeStyle = LINE_COL.base; ctx.lineWidth = hair * 1.4; ctx.beginPath();
     rows.forEach(y => hline(y + 2 * sp)); ctx.stroke();
-    ctx.strokeStyle = LINE_COL.thirds; ctx.lineWidth = hair * 1.2; ctx.setLineDash([0.9, 1.3]); ctx.beginPath();
-    rows.forEach(y => hline(y + sp)); ctx.stroke(); ctx.setLineDash([]);
+    dotted(rows.map(y => y + sp), LINE_COL.thirds, hair * 1.2);
+  } else if (t === 'thirds2' || t === 'sky') {
+    // Rows of three equal bands touching each other: solid line, two dotted lines, solid line.
+    // Sky, grass, dirt colours the bands: tall letters reach the sky, tails go down into the dirt.
+    const rows = [];
+    for (let y = TOP_GAP; y + 3 * sp <= H - 6; y += 3 * sp) rows.push(y);
+    if (t === 'sky') {
+      rows.forEach(y => ['sky', 'grass', 'dirt'].forEach((c, i) => { ctx.fillStyle = LINE_COL[c]; ctx.fillRect(0, y + i * sp, W, sp); }));
+    }
+    const solid = t === 'sky' ? LINE_COL.band : LINE_COL.base, dots = t === 'sky' ? LINE_COL.band : LINE_COL.thirds;
+    ctx.strokeStyle = solid; ctx.lineWidth = hair; ctx.beginPath();
+    rows.forEach(y => hline(y)); if (rows.length) hline(rows[rows.length - 1] + 3 * sp);
+    ctx.stroke();
+    dotted(rows.flatMap(y => [y + sp, y + 2 * sp]), dots, hair * 1.2);
   } else if (t === 'grid') {
-    const ox = (PAGE_W % sp) / 2, oy = (PAGE_H % sp) / 2;
+    const ox = (W % sp) / 2, oy = (H % sp) / 2;
     ctx.strokeStyle = LINE_COL.grid; ctx.lineWidth = hair; ctx.beginPath();
-    for (let x = ox; x <= PAGE_W + 0.01; x += sp) { const xx = snap(x); ctx.moveTo(xx, 0); ctx.lineTo(xx, PAGE_H); }
-    for (let y = oy; y <= PAGE_H + 0.01; y += sp) hline(y);
+    for (let x = ox; x <= W + 0.01; x += sp) { const xx = snap(x); ctx.moveTo(xx, 0); ctx.lineTo(xx, H); }
+    for (let y = oy; y <= H + 0.01; y += sp) hline(y);
     ctx.stroke();
   }
   if (m > 0) {
     ctx.strokeStyle = LINE_COL.margin; ctx.lineWidth = hair * 1.3; ctx.beginPath();
-    const xx = snap(m); ctx.moveTo(xx, 0); ctx.lineTo(xx, PAGE_H); ctx.stroke();
+    const xx = snap(m); ctx.moveTo(xx, 0); ctx.lineTo(xx, H); ctx.stroke();
   }
 }
 

@@ -1,7 +1,7 @@
 /* Shapes: recognising a hand-drawn shape, and the geometry for every shape and
    graphic organiser the Insert tool can place. Everything is in millimetres and
    comes out as polylines ([[x, y], ...]), which become ordinary pen strokes. */
-import { PAGE_W, PAGE_H, TOP_GAP } from './config.js';
+import { pageSize, TOP_GAP } from './config.js';
 
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 function segDist(p, a, b) {
@@ -130,7 +130,8 @@ export function recognise(flat) {
    Insertable shapes and organisers. Each make() takes the box the teacher
    dragged ({ x, y, w, h }) plus the drag's start and end points, and returns polylines.
    fit: what a tap (rather than a drag) does — 'size' = a default size at the tap,
-   'page' = fill the page's writing area, 'band' = full width at the tap.
+   'page' = fill the page's writing area, 'half' = fill the top or bottom half (whichever
+   was tapped), 'band' = full width at the tap.
    ========================================================================= */
 const ARROW = 4.5;
 export const INSERTS = [
@@ -145,11 +146,11 @@ export const INSERTS = [
     const head = r.y + Math.min(r.h * 0.14, 16);
     return [line([r.x, head], [r.x + r.w, head]), line([r.x + r.w / 2, r.y], [r.x + r.w / 2, r.y + r.h])];
   } },
-  { id: 'venn2', group: 'Organisers', label: 'Venn', say: 'Venn diagram', fit: 'page', make: r => {
+  { id: 'venn2', group: 'Organisers', label: 'Venn', say: 'Venn diagram', fit: 'half', make: r => {
     const rad = Math.min(r.w / 3.1, r.h / 2), d = rad * 1.1, cx = r.x + r.w / 2, cy = r.y + r.h / 2;
     return [ellipse(cx - d / 2, cy, rad, rad), ellipse(cx + d / 2, cy, rad, rad)];
   } },
-  { id: 'venn3', group: 'Organisers', label: 'Venn × 3', say: 'three-circle Venn diagram', fit: 'page', make: r => {
+  { id: 'venn3', group: 'Organisers', label: 'Venn × 3', say: 'three-circle Venn diagram', fit: 'half', make: r => {
     const rad = Math.min(r.w / 3.1, r.h / 2.95), d = rad * 1.1, cx = r.x + r.w / 2, cy = r.y + r.h / 2 - d * 0.145;
     return [ellipse(cx - d / 2, cy - d * 0.29, rad, rad), ellipse(cx + d / 2, cy - d * 0.29, rad, rad), ellipse(cx, cy + d * 0.58, rad, rad)];
   } },
@@ -211,9 +212,11 @@ export function tapBox(item, [x, y], pg) {
     if (item.id === 'line' || item.id === 'arrow') return { a: [x - 30, y], b: [x + 30, y] };
     const s = 40; return { a: [x - s / 2, y - s / 2], b: [x + s / 2, y + s / 2] };
   }
-  const m = pg.margin[pg.tpl] || 0, left = m > 0 ? m + 5 : 12, right = PAGE_W - 12;
+  const [W, H] = pageSize(pg), m = pg.margin[pg.tpl] || 0, left = m > 0 ? m + 5 : 12, right = W - 12;
+  const top = TOP_GAP + 6, bottom = H - 14, mid = (top + bottom) / 2;
   if (item.fit === 'band') { const h = item.bandH; return { a: [left, y - h / 2], b: [right, y + h / 2] }; }
-  return { a: [left, TOP_GAP + 6], b: [right, PAGE_H - 14] };
+  if (item.fit === 'half') return y < mid ? { a: [left, top], b: [right, mid - 4] } : { a: [left, mid + 4], b: [right, bottom] };
+  return { a: [left, top], b: [right, bottom] };
 }
 
 /* Polylines for an item placed from a to b (the drag's start and end). */

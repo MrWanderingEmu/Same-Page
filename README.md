@@ -1,16 +1,17 @@
 # Same Page
 
-A modelling whiteboard for teachers whose pages match the students' exercise books: A4 pages with ruled, dotted-thirds, grid or blank paper, at true millimetre spacing. Write with a stylus and what students see on the screen is exactly what's possible in their own books.
+A modelling whiteboard for teachers whose pages match the students' exercise books: A4 pages, portrait or landscape, with ruled, dotted-thirds, sky-grass-dirt, grid or blank paper, at true millimetre spacing. Write with a stylus and what students see on the screen is exactly what's possible in their own books.
 
 - **A shelf of notebooks:** the *Notebooks* button (top of the right toolbar) shows every notebook as an exercise-book cover: one for spelling, one for novel study, one for maths examples, and so on. Each has its own name, cover colour and starting paper, and remembers its own last page and view.
 - **One page or two:** *Two pages* (or press **B**) shows the book lying open: two A4 pages side by side with the spine down the middle. By default page 1 sits on the right, opposite the inside cover, like a real exercise book; *More › Two-page view starts with* changes that to pages 1 and 2 together.
 - **Pen, highlighter, eraser** with pressure, palm rejection, and the pen's eraser end or side button.
 - **Shape snapping:** draw a line, circle, oval, rectangle or triangle and hold the pen still at the end; it tidies into a clean shape (lines snap level when they're close). Works with the highlighter too, and can be turned off under *More*.
-- **Insert** shapes (line, arrow, rectangle, circle, triangles) and graphic organisers (T-chart, Venn, three-circle Venn, Y-chart, three columns, Frayer model, 2 × 2 grid, story mountain, mind map, number line, sequence). Drag a box to place one, or tap to fill the page. They're drawn in pen ink, so Undo and the eraser work on them.
+- **Insert** shapes (line, arrow, rectangle, circle, triangles) and graphic organisers (T-chart, Venn, three-circle Venn, Y-chart, three columns, Frayer model, 2 × 2 grid, story mountain, mind map, number line, sequence). Drag a box to place one, or tap to fill the page (a Venn fills the top or bottom half, whichever you tap). They're drawn in pen ink, so Undo and the eraser work on them.
+- **Ruler** (**R**): a see-through 30 cm ruler at true size. Start a pen or highlighter stroke along either long edge and it comes out dead straight, for modelling ruling up a margin or underlining. Drag the ruler to move it; drag the round knob to turn it (it clicks to level, upright and 45°), or tap the knob to swap between level and upright.
 - **Select:** draw a loop round anything (or tap one line) to select it, then drag to move it, drag the corner handle to resize, tap a colour to recolour, or use *Duplicate* / *Delete*.
 - **Laser pointer:** a glowing red dot follows the pen, and anything you draw with it fades away a moment later. Nothing is saved.
 - **Double-tap a page** (pen or finger) to focus on it from two-page view; double-tap again to see both pages.
-- **Paper per page:** line spacing, margin, and template; *Use this paper on all pages* copies it to every page.
+- **Paper per page:** portrait or landscape, line spacing, margin, and paper type: ruled, dotted thirds (solid, dotted, solid, then a space for tails), two-dotted thirds (solid, dotted, dotted, solid), sky-grass-dirt (coloured bands for early writers), grid or blank. *Use this paper on all pages* copies it to every page. Landscape pages print sideways on A4.
 - **Present mode** (**F**): full screen with a small floating toolbar.
 - **Saves automatically** in the browser, one page at a time, so big notebooks stay quick. *Back up all* on the shelf saves every notebook into one file (a reminder appears on the shelf if it's been 3 weeks), and *Open a file* restores a backup or adds a single notebook file. *Print or save as PDF* prints every page at true A4.
 - **Works offline** once it has been opened, and can be installed as an app from the browser's address bar.
@@ -21,6 +22,7 @@ A modelling whiteboard for teachers whose pages match the students' exercise boo
 | --- | --- |
 | P / H / E | Pen / highlighter / eraser |
 | S / L / I | Select / laser pointer / insert a shape or organiser |
+| R | Show or hide the ruler |
 | Delete, Ctrl+D | Delete or duplicate the selection |
 | B | One page ↔ two pages |
 | F | Present (Esc to stop) |
@@ -63,6 +65,7 @@ js/input.js           pen / mouse / touch, palm rejection, eraser, hold-to-snap,
 js/shapes.js          recognising drawn shapes; geometry for every shape and organiser
 js/select.js          lasso selection: move, resize, recolour, duplicate, delete
 js/laser.js           laser pointer trails and dot
+js/ruler.js           the ruler: moving and turning it, ruling strokes along its edge
 js/history.js         undo / redo across the whole notebook
 js/pages.js           navigating, adding, deleting pages; paper settings
 js/export.js          image export and print / PDF
@@ -75,4 +78,4 @@ manifest.webmanifest  install-as-app details
 
 Browser storage holds four stores: `notebooks` (one small record each), `pages` (one record per page, ink stored compactly as whole hundredths of a millimetre), `assets` (reserved for images) and `kv` (settings). Notebook and backup files are plain JSON; single-notebook files can still be opened by the first version of the app.
 
-All ink and paper geometry is stored in millimetres on a 210 × 297 page, so it scales to any screen and exports at true A4 size.
+All ink and paper geometry is stored in millimetres on a 210 × 297 page (297 × 210 for a landscape page), so it scales to any screen and exports at true A4 size.

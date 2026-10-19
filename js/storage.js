@@ -59,7 +59,7 @@ const encStroke = s => ({ t: s.t, c: s.c, w: s.w, pr: !!s.pr, p: Int32Array.from
 const decStroke = s => ({ t: s.t, c: s.c, w: s.w, pr: !!s.pr, p: Array.from(s.p || [], v => v / 100) });
 
 export function pageRecord(pg, nbId) {
-  return { id: pg.id, nb: nbId, tpl: pg.tpl, spacing: { ...pg.spacing }, margin: { ...pg.margin }, strokes: pg.strokes.map(encStroke) };
+  return { id: pg.id, nb: nbId, tpl: pg.tpl, land: !!pg.land, spacing: { ...pg.spacing }, margin: { ...pg.margin }, strokes: pg.strokes.map(encStroke) };
 }
 export function pageFromRecord(r) {
   const p = makePage(r, r.id);
@@ -96,7 +96,7 @@ export function cleanMeta(m, pageIds) {
 /* What's already in storage, so a save only writes pages that changed. */
 let saved = new WeakMap();    // page -> { strokes (array ref), n (length), paper (key) }
 let savedIds = new Set();     // page ids stored for the open notebook
-const paperKey = pg => pg.tpl + JSON.stringify(pg.spacing) + JSON.stringify(pg.margin);
+const paperKey = pg => pg.tpl + (pg.land ? 'L' : 'P') + JSON.stringify(pg.spacing) + JSON.stringify(pg.margin);
 const mark = pg => ({ strokes: pg.strokes, n: pg.strokes.length, paper: paperKey(pg) });
 
 /* Makes a notebook the open one. records = its page records as found in storage. */

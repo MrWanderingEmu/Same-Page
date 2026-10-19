@@ -1,5 +1,5 @@
 /* Toolbars, popovers, present mode, and the click / keyboard handlers. */
-import { PAGE_W, PEN_COLOURS, HL_COLOURS, TEMPLATES } from './config.js';
+import { pageSize, PEN_COLOURS, HL_COLOURS, TEMPLATES } from './config.js';
 import { state, page, makePage, visiblePages } from './state.js';
 import { $, $$, toast } from './util.js';
 import { stage, layout, renderBgFor, hideEraser } from './board.js';
@@ -8,11 +8,12 @@ import { scheduleSave, saveNow } from './storage.js';
 import { saveNotebookFile } from './library.js';
 import { openShelf, shelfOpen, shelfEscape } from './shelf.js';
 import { undo, redo, clearVisible, canUndo, canRedo } from './history.js';
-import { stepPage, stepTarget, addPage, addPageAtEnd, deletePage, setTemplate, applyPaperToAll, toggleSpread, setBookStart } from './pages.js';
+import { stepPage, stepTarget, addPage, addPageAtEnd, deletePage, setTemplate, setLandscape, applyPaperToAll, toggleSpread, setBookStart } from './pages.js';
 import { exportPng, printAll } from './export.js';
 import { INSERTS, placeItem } from './shapes.js';
 import { hasSelection, clearSelection, deleteSelection, duplicateSelection, recolourSelection } from './select.js';
 import { hideDot } from './laser.js';
+import { toggleRuler } from './ruler.js';
 
 /* --- tools --- */
 export function buildSwatches() {
@@ -53,7 +54,7 @@ function renderInsertPop() {
   const groups = [...new Set(INSERTS.map(i => i.group))];
   $('#insertPop').innerHTML = groups.map(g => `<div class="group">${g}</div><div class="inserts">${INSERTS.filter(i => i.group === g).map(i =>
     `<button class="ins${state.tool === 'insert' && state.insert === i.id ? ' on' : ''}" data-insert="${i.id}">${insertIcon(i)}${i.label}</button>`).join('')}</div>`).join('') +
-    '<p class="note" style="margin:0">Pick one, then drag a box on the page. For an organiser, tap the page instead to fill it.</p>';
+    '<p class="note" style="margin:0">Pick one, then drag a box on the page. For an organiser, tap the page instead to fill it (a Venn fills the half you tap).</p>';
 }
 function chooseInsert(id) {
   const item = INSERTS.find(i => i.id === id);
@@ -62,6 +63,7 @@ function chooseInsert(id) {
   closePops(); renderTools();
   const name = item.say || item.label.toLowerCase();
   toast(item.fit === 'page' ? `Drag a box for the ${name}, or tap the page to fill it.`
+    : item.fit === 'half' ? `Drag a box for the ${name}, or tap the top or bottom half of the page.`
     : item.fit === 'band' ? `Drag to place the ${name}, or tap for the full width.` : `Drag on the page to draw a ${name}.`);
 }
 /* Back to the pen (or highlighter) after placing something, or on Esc. */
@@ -122,20 +124,30 @@ export function closePops() {
 export const paperPopOpen = () => $('#paperPop').classList.contains('open');
 
 /* --- paper popover --- */
-const PREVIEW = { ruled: 14, thirds: 9, grid: 15 };
+const PREVIEW = { ruled: 14, thirds: 9, thirds2: 9, sky: 9, grid: 15 };
+const NOTES = {
+  thirds: 'Each row: solid top line, dotted middle line, solid base line, then a space for tails.',
+  thirds2: 'Each row: solid line, two dotted lines, solid line. Letters sit on the lower dotted line and tails drop to the solid line.',
+  sky: 'Tall letters reach up into the sky, small letters sit on the grass, and tails dig down into the dirt.',
+  blank: 'A plain page with no lines.',
+};
 /* A thumbnail of a paper type (exaggerated spacing so the pattern reads at this size). */
-export function drawPreview(c, tpl) {
-  const dpr = window.devicePixelRatio || 1, k = 56 / PAGE_W * dpr;
-  c.width = Math.round(56 * dpr); c.height = Math.round(79 * dpr);
+export function drawPreview(c, tpl, land = false) {
+  const fake = makePage(); fake.tpl = tpl; fake.land = land;
+  const [W, H] = pageSize(fake), cw = land ? 62 : 56, ch = Math.round(cw * H / W);
+  const dpr = window.devicePixelRatio || 1, k = cw / W * dpr;
+  c.width = Math.round(cw * dpr); c.height = Math.round(ch * dpr);
+  c.style.width = cw + 'px'; c.style.height = ch + 'px';
   const ctx = c.getContext('2d'); ctx.setTransform(k, 0, 0, k, 0, 0);
-  const fake = makePage(); fake.tpl = tpl;
-  fake.spacing = { ...PREVIEW }; fake.margin = { ruled: 34, thirds: 34, grid: 0 };
+  fake.spacing = { ...PREVIEW };
+  fake.margin = Object.fromEntries(Object.keys(PREVIEW).map(t => [t, TEMPLATES[t].margin ? 34 : 0]));
   drawTemplate(ctx, fake, k);
 }
 export function renderPaperPop() {
   const pop = $('#paperPop'), pg = page(), t = pg.tpl, T = TEMPLATES[t];
   pop.innerHTML = `
     <h3>Paper — page ${state.cur + 1}</h3>
+    <div class="seg orient"><button data-orient="port"${pg.land ? '' : ' class="on"'}>Portrait</button><button data-orient="land"${pg.land ? ' class="on"' : ''}>Landscape</button></div>
     <div class="tpls">${Object.keys(TEMPLATES).map(k =>
       `<button class="tpl${k === t ? ' on' : ''}" data-tpl="${k}"><canvas data-preview="${k}"></canvas>${TEMPLATES[k].label}</button>`).join('')}</div>
     ${T.spacing ? `
@@ -143,10 +155,10 @@ export function renderPaperPop() {
         <input type="range" id="spIn" min="${T.spacing.min}" max="${T.spacing.max}" step="${T.spacing.step}" value="${pg.spacing[t]}"></label>
       <label class="field"><span class="row"><span>Margin</span><b id="mgVal">${pg.margin[t] ? pg.margin[t] + ' mm' : 'None'}</b></span>
         <input type="range" id="mgIn" min="0" max="40" step="1" value="${pg.margin[t]}"></label>
-      ${t === 'thirds' ? '<p class="note">Each row: solid top line, dotted middle line, solid base line, then a space for tails.</p>' : ''}`
-      : '<p class="note">A plain page with no lines.</p>'}
+      ${NOTES[t] ? `<p class="note">${NOTES[t]}</p>` : ''}`
+      : `<p class="note">${NOTES.blank}</p>`}
     <button class="wide" data-act="applyAll">Use this paper on all pages</button>`;
-  pop.querySelectorAll('[data-preview]').forEach(c => drawPreview(c, c.dataset.preview));
+  pop.querySelectorAll('[data-preview]').forEach(c => drawPreview(c, c.dataset.preview, pg.land));
   const sp = pop.querySelector('#spIn'), mg = pop.querySelector('#mgIn');
   if (sp) sp.oninput = () => { pg.spacing[t] = +sp.value; pop.querySelector('#spVal').textContent = sp.value + ' mm'; renderBgFor(pg); scheduleSave(); };
   if (mg) mg.oninput = () => { pg.margin[t] = +mg.value; pop.querySelector('#mgVal').textContent = +mg.value ? mg.value + ' mm' : 'None'; renderBgFor(pg); scheduleSave(); };
@@ -198,6 +210,7 @@ function onClick(e) {
   if (b.dataset.act === 'insert') { renderInsertPop(); showPop($('#insertPop'), b); return; }
   if (b.dataset.snap) { state.snap = b.dataset.snap === 'on'; updateMenu(); scheduleSave(); return; }
   if (b.dataset.tpl) return setTemplate(b.dataset.tpl);
+  if (b.dataset.orient) return setLandscape(b.dataset.orient === 'land');
   if (b.dataset.bookstart) { setBookStart(b.dataset.bookstart); updateMenu(); return; }
   if (b.dataset.finger) { state.finger = b.dataset.finger; updateMenu(); scheduleSave(); return; }
   if (b.dataset.pressure) { state.pressure = b.dataset.pressure === 'on'; updateMenu(); scheduleSave(); return; }
@@ -216,6 +229,7 @@ function onClick(e) {
     case 'delete': return deletePage();
     case 'applyAll': return applyPaperToAll();
     case 'spread': return toggleSpread();
+    case 'ruler': return toggleRuler();
     case 'view': state.view = state.view === 'page' ? 'width' : 'page'; updateViewBtns(); stage.scrollTop = 0; layout(); scheduleSave(); return;
     case 'present': return togglePresent();
     case 'saveFile': closePops(); return saveNotebookFile();
@@ -241,6 +255,7 @@ function onKey(e) {
   else if (k === 'b') toggleSpread();
   else if (k === 's') setTool('select');
   else if (k === 'l') setTool('laser');
+  else if (k === 'r') toggleRuler();
   else if ((k === 'delete' || k === 'backspace') && hasSelection()) { e.preventDefault(); deleteSelection(); }
   else if (k === 'i') { const b = state.presenting ? $('#mini [data-act="insert"]') : $('.rail [data-act="insert"]'); renderInsertPop(); showPop($('#insertPop'), b); }
   else if (k === 'arrowdown' || k === 'pagedown' || (k === 'arrowright' && !e.shiftKey)) { e.preventDefault(); stepPage(1); }

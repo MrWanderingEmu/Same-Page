@@ -6,7 +6,8 @@
    - Hold the pen still at the end of a stroke and a rough shape snaps into a clean one.
    - Insert tool: drag a box to place a shape or organiser (or tap to use its default size).
    - Double-tap a page (pen or finger) to switch between one page and two.
-   - Select tool (select.js) and laser pointer (laser.js) get their gestures from here too. */
+   - Select tool (select.js), laser pointer (laser.js) and ruler (ruler.js) get their gestures from here too.
+   - A pen or highlighter stroke started along the ruler's edge is ruled straight. */
 import { PEN_COLOURS, HL_COLOURS, PEN_SIZES, HL_SIZES, ERASER_SIZES, HL_ALPHA } from './config.js';
 import { state } from './state.js';
 import { stage, view, sheets, sheetAt, clearLive, renderInkFor, showEraser, hideEraser } from './board.js';
@@ -18,6 +19,7 @@ import { closePops, updateMenu, finishInsert } from './ui.js';
 import { recognise, densify, insertById, placeItem, tapBox } from './shapes.js';
 import { selDown, selMove, selUp } from './select.js';
 import { laserDown, laserMove, laserUp, showDot, hideDot } from './laser.js';
+import { rulerHit, ruledPoint, rulerDown, rulerMove, rulerUp } from './ruler.js';
 
 let active = null;          // the current gesture
 let lastPen = -1e9;         // time of the last pen event (hover counts)
@@ -48,15 +50,21 @@ function onDown(e) {
     if (e.pointerType !== 'touch' && active.ptype === 'touch') { if (active.sheet) clearLive(active.sheet); active = null; }
     else return;
   }
+  if (e.pointerType === 'touch' && now - lastPen < PALM_WINDOW) return;  // palm rejection
+  if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 2) return;
+  const rh = rulerHit(e.clientX, e.clientY);
+  if (rh && rh.kind !== 'edge' && !wantsEraser(e) && state.tool !== 'laser') {   // move or turn the ruler
+    e.preventDefault(); closePops(); capture(e.pointerId);
+    active = { id: e.pointerId, ptype: e.pointerType, kind: 'ruler', g: rulerDown(rh, e.clientX, e.clientY) };
+    return;
+  }
   if (e.pointerType === 'touch') {
-    if (now - lastPen < PALM_WINDOW) return;                              // palm rejection
     if (touchMode() === 'scroll') {
       active = { id: e.pointerId, ptype: 'touch', kind: 'pan', x: e.clientX, y: e.clientY, st: stage.scrollTop, sl: stage.scrollLeft, t0: now };
       capture(e.pointerId);
       return;
     }
   }
-  if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 2) return;
   const rects = sheets.map(s => s.el.getBoundingClientRect());
   const sheet = sheetAt(e.clientX, rects);
   if (sheet.kind !== 'page') return;                                      // inside cover / blank page
@@ -81,13 +89,14 @@ function onDown(e) {
   } else if (state.tool === 'insert') {
     startInsert(e, sheet, rects[sheets.indexOf(sheet)]);
   } else {
-    startStroke(e, sheet, rects[sheets.indexOf(sheet)]);
+    startStroke(e, sheet, rects[sheets.indexOf(sheet)], rh && rh.kind === 'edge' ? rh : null);
   }
 }
 
 function onMove(e) {
   if (e.pointerType === 'pen') lastPen = performance.now();
   if (!active || e.pointerId !== active.id) { hoverCursor(e); return; }
+  if (active.kind === 'ruler') { rulerMove(active.g, e.clientX, e.clientY); return; }
   if (active.kind === 'pan') {
     stage.scrollTop = active.st - (e.clientY - active.y);
     stage.scrollLeft = active.sl - (e.clientX - active.x);
@@ -99,11 +108,11 @@ function onMove(e) {
     if (active.snapped) return;                                  // already a clean shape: wait for the pen to lift
     if (s.t === 'pen') penStyle(sheet.ctxLive, s);
     for (const ev of evs) {
-      const [x, y] = toPage(ev, rect);
+      const [x, y] = strokePoint(ev);
       if (addPoint(ev, x, y) && s.t === 'pen') drawSeg(sheet.ctxLive, s, s.p.length / 3 - 1);
     }
     if (s.t === 'hl') drawHlLive(sheet, s);
-    watchHold(toPage(e, rect));
+    if (!active.edge) watchHold(toPage(e, rect));
   } else if (active.kind === 'insert') {
     active.b = toPage(e, active.rect);
     previewInsert(active);
@@ -123,6 +132,7 @@ function onEnd(e) {
   const a = active; active = null;
   clearTimeout(a.holdTimer);
   const now = performance.now();
+  if (a.kind === 'ruler') { rulerUp(a.g); return; }
   if (a.kind === 'pan') {
     // Swipe left/right to change page (or spread) when the page isn't scrollable.
     const dx = e.clientX - a.x, dy = e.clientY - a.y;
@@ -166,7 +176,8 @@ function onEnd(e) {
   }
 }
 
-function startStroke(e, sheet, rect) {
+/* edge = the ruler edge the stroke started on, if any: every point then slides onto that edge. */
+function startStroke(e, sheet, rect, edge) {
   const hl = state.tool === 'hl';
   const s = {
     t: hl ? 'hl' : 'pen',
@@ -175,12 +186,19 @@ function startStroke(e, sheet, rect) {
     pr: !hl && state.pressure && e.pointerType === 'pen',
     p: [],
   };
-  active = { id: e.pointerId, ptype: e.pointerType, kind: 'stroke', s, sheet, rect, pg: state.pages[sheet.pi], t0: performance.now() };
-  const [x, y] = toPage(e, rect);
+  active = { id: e.pointerId, ptype: e.pointerType, kind: 'stroke', s, sheet, rect, pg: state.pages[sheet.pi], t0: performance.now(), edge };
+  const [x, y] = strokePoint(e);
   addPoint(e, x, y);
   clearLive(sheet);
   if (hl) drawHlLive(sheet, s); else { penStyle(sheet.ctxLive, s); drawDot(sheet.ctxLive, s); }
-  watchHold([x, y]);
+  if (!edge) watchHold([x, y]);
+}
+/* Where a pointer event puts ink on the stroke's page (mm), slid onto the ruler's edge for a ruled stroke. */
+function strokePoint(ev) {
+  const { edge, rect, s } = active;
+  if (!edge) return toPage(ev, rect);
+  const [cx, cy] = ruledPoint(edge, ev.clientX, ev.clientY, s.w / 2);
+  return toPage({ clientX: cx, clientY: cy }, rect);
 }
 
 /* A quick touch that barely moved: a dot, or half of a double-tap. */
@@ -308,7 +326,7 @@ function eraseAlong(cx, cy) {
     }
   }
   a.lx = cx; a.ly = cy;
-  touched.forEach(renderInkFor);
+  touched.forEach(pg => renderInkFor(pg));   // not forEach(renderInkFor): Set.forEach would pass pg again as `skip`
 }
 function hoverCursor(e) {
   if (e.pointerType === 'touch') return;

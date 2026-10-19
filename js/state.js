@@ -21,18 +21,21 @@ export const state = {
   presenting: false,
 };
 
-/* A new page, copying the paper (not the ink) of src if given. */
+/* A new page, copying the paper (not the ink) of src if given.
+   land = the page is turned on its side (landscape). */
+const LINED = Object.keys(TEMPLATES).filter(k => TEMPLATES[k].spacing);
 export function makePage(src, id) {
   const p = {
     id: typeof id === 'string' && id ? id : uid(),
-    tpl: 'ruled',
-    spacing: { ruled: TEMPLATES.ruled.spacing.def, thirds: TEMPLATES.thirds.spacing.def, grid: TEMPLATES.grid.spacing.def },
-    margin:  { ruled: TEMPLATES.ruled.margin, thirds: TEMPLATES.thirds.margin, grid: TEMPLATES.grid.margin },
+    tpl: 'ruled', land: false,
+    spacing: Object.fromEntries(LINED.map(k => [k, TEMPLATES[k].spacing.def])),
+    margin:  Object.fromEntries(LINED.map(k => [k, TEMPLATES[k].margin])),
     strokes: [],
   };
   if (src) {
     if (TEMPLATES[src.tpl]) p.tpl = src.tpl;
-    for (const k of ['ruled', 'thirds', 'grid']) {
+    p.land = src.land === true;
+    for (const k of LINED) {
       const t = TEMPLATES[k];
       if (src.spacing && isFinite(src.spacing[k])) p.spacing[k] = clamp(+src.spacing[k], t.spacing.min, t.spacing.max);
       if (src.margin && isFinite(src.margin[k])) p.margin[k] = clamp(+src.margin[k], 0, 60);

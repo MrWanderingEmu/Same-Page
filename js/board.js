@@ -3,25 +3,36 @@
    in two-page view they sit side by side as an open book, and each one shows a page,
    the inside front cover, or a faint blank page after the last one. */
 import { $, $$ } from './util.js';
-import { PAGE_W, PAGE_H, ERASER_SIZES } from './config.js';
+import { pageSize, ERASER_SIZES } from './config.js';
 import { state, spreadOf } from './state.js';
 import { drawTemplate, drawStroke } from './draw.js';
 
 export const stage = $('#stage');
 const wrap = $('#pagewrap'), book = $('#book'), ecur = $('#ecursor'), folios = $$('#folios span');
-export const view = { scale: 1, dpr: 1, w: 0, h: 0 };   // scale = CSS px per mm
+export const view = { scale: 1, dpr: 1 };   // scale = CSS px per mm
 
 /* kind: 'page' (pi = page index) | 'cover' | 'ghost' | 'off' */
 export const sheets = $$('.sheet').map(el => {
   const [bg, ink, live] = ['bg', 'ink', 'live'].map(c => el.querySelector('canvas.' + c));
   return {
-    el, bg, ink, live, pi: -1, kind: 'off',
+    el, bg, ink, live, pi: -1, kind: 'off', w: 0, h: 0,   // w, h = size on screen, CSS px
     ctxBg: bg.getContext('2d'), ctxInk: ink.getContext('2d'),
     ctxLive: live.getContext('2d', { desynchronized: true }),   // lower pen latency where supported
   };
 });
 
+/* The paper size (mm) a sheet shows: its page's, the last page's for the blank page after it,
+   and the facing page's for the inside cover. Pages can be portrait or landscape. */
+function sheetMm(s, other) {
+  const pg = s.kind === 'page' ? state.pages[s.pi] : s.kind === 'ghost' ? state.pages[state.pages.length - 1]
+    : other && other.kind === 'page' ? state.pages[other.pi] : null;
+  return pageSize(pg);
+}
+
+/* Sizes the sheets to the screen and redraws everything. Every sheet shares one scale,
+   so a millimetre is the same size on both pages. */
 export function layout() {
+  assignSheets();
   const sw = stage.clientWidth, sh = stage.clientHeight;
   if (!sw || !sh) return;
   const spread = state.spread;
@@ -31,30 +42,42 @@ export function layout() {
   const fitPage = state.presenting || state.view === 'page';
   const side = state.presenting ? 86 : pad;                        // keep clear of the floating toolbar
   const aw = sw - side * 2 - cover * 2, ah = sh - pad * 2 - cover * 2 - folioH;
-  let w = aw / (spread ? 2 : 1);
-  if (fitPage) w = Math.min(w, ah * PAGE_W / PAGE_H);
-  w = Math.max(spread ? 120 : 160, Math.floor(w));
-  const h = Math.round(w * PAGE_H / PAGE_W);
+  const shown = spread ? sheets : [sheets[0]];
+  const mm = shown.map((s, i) => sheetMm(s, shown[1 - i]));
+  const totalW = mm.reduce((n, [w]) => n + w, 0), maxH = Math.max(...mm.map(([, h]) => h));
+  let scale = aw / totalW;
+  if (fitPage) scale = Math.min(scale, ah / maxH);
+  scale = Math.max(scale, (spread ? 240 : 160) / totalW);
+  const h = Math.round(maxH * scale);
 
   stage.classList.toggle('fit', fitPage);
   book.classList.toggle('spread', spread);
   book.classList.toggle('single', !spread);
   book.style.setProperty('--cover-pad', cover + 'px');
-  for (const s of sheets) { s.el.style.width = w + 'px'; s.el.style.height = h + 'px'; }
-  folios.forEach(f => f.style.width = w + 'px');
+  let biggest = 0;
+  shown.forEach((s, i) => {
+    s.w = Math.round(mm[i][0] * scale); s.h = Math.round(mm[i][1] * scale);
+    s.el.style.width = s.w + 'px'; s.el.style.height = s.h + 'px';
+    folios[i].style.width = s.w + 'px';
+    biggest = Math.max(biggest, s.w * s.h);
+  });
   wrap.style.paddingTop = Math.max(pad, Math.floor((sh - h - cover * 2 - folioH) / 2)) + 'px';
   wrap.style.paddingBottom = pad + 'px';
 
   // Keep each canvas under ~9 megapixels (~6 in two-page view) so large screens stay fast.
   let dpr = window.devicePixelRatio || 1;
-  dpr = Math.min(dpr, Math.sqrt((spread ? 6e6 : 9e6) / (w * h)));
-  const changed = w !== view.w || h !== view.h || dpr !== view.dpr;
-  view.w = w; view.h = h; view.dpr = dpr; view.scale = w / PAGE_W;
-  if (changed) {
-    for (const s of sheets) for (const c of [s.bg, s.ink, s.live]) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+  dpr = Math.min(dpr, Math.sqrt((spread ? 6e6 : 9e6) / biggest));
+  view.dpr = dpr; view.scale = scale;
+  for (const s of shown) {
+    const cw = Math.round(s.w * dpr), ch = Math.round(s.h * dpr);
+    if (s.bg.width !== cw || s.bg.height !== ch) for (const c of [s.bg, s.ink, s.live]) { c.width = cw; c.height = ch; }
   }
-  renderAll();
+  paint();
+  layoutHooks.forEach(fn => fn());
 }
+/* Things positioned over the pages (the ruler) that must follow the layout. */
+const layoutHooks = [];
+export const onLayout = fn => layoutHooks.push(fn);
 
 function prep(ctx) {           // clear a canvas and set its units to millimetres
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -93,8 +116,9 @@ export function clearLive(s) { prep(s.ctxLive); }
 let overlay = null;
 export const setOverlay = fn => { overlay = fn; };
 
-export function renderAll() {
-  assignSheets();
+/* Redraws everything. Goes through layout(), since a page turn can show a page of another shape. */
+export const renderAll = () => layout();
+function paint() {
   for (const s of sheets) { renderBg(s); renderInk(s); clearLive(s); }
   updateFolios();
   if (overlay) overlay();

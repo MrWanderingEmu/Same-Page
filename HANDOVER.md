@@ -1,6 +1,6 @@
 # Same Page — handover notes
 
-*Last updated 18 October 2026.*
+*Last updated 19 October 2026.*
 
 ## What it is
 
@@ -21,6 +21,16 @@ Same Page is a stylus whiteboard for teachers whose pages match the students' ex
 | `ac863b3` | **Hold-to-snap shapes**, the **Insert** tool (6 shapes and 11 graphic organisers) and **double-tap** to switch between one and two pages. Also fixed a nearly invisible page counter |
 | `f37c984` | **Lasso Select** (move, resize, recolour, duplicate, delete) and the **laser pointer** |
 
+## First classroom test (19 Oct 2026) and what changed
+
+The teacher used it with a class and preferred it to Microsoft Whiteboard: no accidental button presses from the hand, no loading or sign-in. Feedback and the changes that followed:
+
+- **Bug: erasing blanked the whole page.** The eraser only removed the strokes it touched, but the redraw crashed: `touched.forEach(renderInkFor)` passed the page in again as `renderInkFor`'s new `skip` argument (added with Select). The canvas was cleared and never redrawn, so the page looked empty; Undo redrew it, which is why Undo "worked". Fixed in `input.js`. Watch for `forEach(fn)` with functions that take a second argument.
+- **Landscape pages:** per page (`pg.land`), set in the Paper popover; copied to new pages and by *Use this paper on all pages*. Ink keeps its millimetre position when the page is turned. In two-page view each sheet takes its own page's shape at one shared scale. Landscape pages print turned sideways on portrait A4.
+- **Two new thirds papers** (colleague request): `thirds2`, which is solid, dotted, dotted, solid with rows touching, and `sky`, the same rows coloured sky, grass and dirt for early writers. The sky paper has no margin by default.
+- **Venn placement:** tapping with Venn or Venn × 3 fills the top or bottom half of the page, whichever was tapped (`fit: 'half'` in `shapes.js`). Other organisers still fill the page.
+- **Ruler** (colleague request, for modelling ruling up a margin): `ruler.js`. It is drawn in a fixed layer over the stage, so it can hang off the page without making it scroll. Input does the hit-testing: body = move, knob = turn (tap = level ↔ upright), within 7 mm outside / 3 mm inside a long edge = a ruled pen or highlighter stroke. The eraser and laser pass straight through it. Its position isn't saved.
+
 The features themselves, and the keyboard shortcuts, are described in [README.md](README.md).
 
 ## Decisions worth knowing (and why)
@@ -37,7 +47,7 @@ The features themselves, and the keyboard shortcuts, are described in [README.md
 ## Housekeeping rules
 
 - **Commit identity:** commits must be signed as `MrWanderingEmu <187715490+MrWanderingEmu@users.noreply.github.com>`, which is set in this repo's own git config. Never use the owner's real name or personal email.
-- **New files:** if you add a file, add it to the `FILES` list in `sw.js` and bump `CACHE` (it's at `same-page-v4` now), or it won't work offline.
+- **New files:** if you add a file, add it to the `FILES` list in `sw.js` and bump `CACHE` (it's at `same-page-v5` now), or it won't work offline.
 - **Storage changes:** if the database layout changes, bump the version in `db.open()` in `js/storage.js` and handle the upgrade. Existing notebooks must keep loading.
 - **Simulating pen input in the browser preview:** the hidden preview pane gives the page zero size and slows animation to about 2 frames a second. Set a window size (e.g. 1280 × 720) first, and don't judge animation timing (like the laser fade) there.
 
@@ -64,7 +74,7 @@ The features themselves, and the keyboard shortcuts, are described in [README.md
 3. **Reveal cover:** a sheet over the page that slides down to uncover a worked example step by step.
 4. **Writing replay:** replay a page stroke by stroke to show letter formation or the order of a method. Stroke order is already stored.
 5. **Page overview:** thumbnails of every page, to jump to one or drag to reorder.
-6. **Ruler and protractor** overlays for modelling measurement and angles.
+6. **Protractor** overlay for modelling angles (the ruler is done). Maybe two-finger twist to turn the ruler.
 7. **Quick notebook switcher** in the toolbar. It was offered alongside the shelf, but the teacher chose the shelf only.
 8. **Linked OneDrive folder:** save notebooks as files in a synced folder, for backup and school ↔ home use. This works in Chrome and Edge only.
 9. **Copy and paste between pages and notebooks;** drag a selection across the spine.

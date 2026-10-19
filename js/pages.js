@@ -1,6 +1,7 @@
 /* Navigating, adding and deleting pages; paper settings; one- or two-page view. */
 import { state, page, makePage, spreadOf, visiblePages } from './state.js';
 import { clamp, toast } from './util.js';
+import { pageSize } from './config.js';
 import { stage, layout, renderAll, renderBgFor, updateFolios } from './board.js';
 import { scheduleSave } from './storage.js';
 import { forgetPage } from './history.js';
@@ -58,9 +59,19 @@ export function deletePage() {
 export function setTemplate(t) {
   page().tpl = t; renderBgFor(page()); renderPaperPop(); scheduleSave();
 }
+/* Turns the page on its side (landscape) or back upright. The ink stays where it is on the paper. */
+export function setLandscape(land) {
+  const pg = page();
+  if (pg.land === land) return;
+  pg.land = land;
+  renderAll(); renderPaperPop(); scheduleSave();
+  const [W, H] = pageSize(pg);
+  const off = pg.strokes.some(s => { for (let i = 0; i < s.p.length; i += 3) if (s.p[i] > W || s.p[i + 1] > H) return true; return false; });
+  if (off) toast(`Some writing is off the ${land ? 'bottom' : 'side'} of the page. Turn it back to see it.`);
+}
 export function applyPaperToAll() {
   const src = page();
-  state.pages.forEach(p => { p.tpl = src.tpl; p.spacing = { ...src.spacing }; p.margin = { ...src.margin }; });
+  state.pages.forEach(p => { p.tpl = src.tpl; p.land = src.land; p.spacing = { ...src.spacing }; p.margin = { ...src.margin }; });
   renderAll();
   toast(`Paper applied to all ${state.pages.length} pages.`);
   scheduleSave();
