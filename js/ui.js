@@ -195,9 +195,25 @@ async function togglePresent() {
   layout();
 }
 
+/* --- palm guard for the toolbars ---
+   The page already ignores palms while the pen is near; the buttons didn't, so the side of a
+   (left) hand resting on the rail could switch tools. A touch press on a button is now dropped
+   while the pen is hovering or was used in the last second. Pen, mouse and keyboard presses,
+   and finger taps with the pen away, work as before. */
+const TOOLBAR_PALM_MS = 1000;
+let lastPenAt = -1e9;     // time of the last pen event anywhere (hover counts)
+let palmPress = null;     // the button a palm just pressed, so its click is ignored
+function onPointerAnywhere(e) {
+  const now = performance.now();
+  if (e.pointerType === 'pen') lastPenAt = now;
+  if (e.type === 'pointerdown')
+    palmPress = e.pointerType === 'touch' && now - lastPenAt < TOOLBAR_PALM_MS ? e.target.closest('button') : null;
+}
+
 /* --- one click handler for every button --- */
 function onClick(e) {
   const b = e.target.closest('button'); if (!b || b.closest('#shelf, #nbMenu, .modal')) return;
+  if (palmPress) { const p = palmPress; palmPress = null; if (p === b) return; }
   if (b.id === 'shelfBtn') return openShelf();
   if (b.dataset.tool) return setTool(b.dataset.tool);
   if (b.dataset.colour != null) {
@@ -268,6 +284,7 @@ function onKey(e) {
 
 export function initUI() {
   buildSwatches();
+  ['pointerdown', 'pointermove', 'pointerup'].forEach(t => document.addEventListener(t, onPointerAnywhere, true));
   document.addEventListener('click', onClick);
   document.addEventListener('keydown', onKey);
   document.addEventListener('pointerdown', e => {

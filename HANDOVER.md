@@ -43,6 +43,12 @@ The teacher picked this next. Their choices: prepared ahead and saved with the p
 - The card is a DOM element inside each sheet, so it follows the page; exports draw the canvases only, so it never prints.
 - Known gap: a Select lasso started above the cover can still pick up strokes under it.
 
+## Feedback of 20 Oct 2026 and what changed
+
+- **Toolbar palm guard.** The teacher is left-handed. Starting to write at the top left, the side of their hand sometimes tapped Highlight on the left rail. The page already ignored palms, but the buttons didn't. Now a touch press on any toolbar button is dropped while the pen is hovering or was used in the last second (`TOOLBAR_PALM_MS` in `ui.js`). Pen, mouse, keyboard and finger taps with the pen away work as before. If palms still get through on the device, the fallback is a "toolbar: pen only" setting.
+- **Shelf storage figure.** It showed `navigator.storage.estimate()`, which includes the offline copy of the app and only shrinks when the browser tidies its database files, so it seemed never to go down after deleting notebooks (the deletes were real). It now adds up the notebooks' own sizes.
+- **Colleague requests, in the agreed order:** images (paste is the main route: Snipping Tool and "Copy image" from the web; also files), PDF pages (a few pages at most, with a page limit), text that sits on the paper's lines, a page overview (reorder, move or copy pages between notebooks, combine notebooks), then a linked OneDrive folder. Sharing notebooks with colleagues means sending a copy as a file, not live shared editing.
+
 The features themselves, and the keyboard shortcuts, are described in [README.md](README.md).
 
 ## Decisions worth knowing (and why)

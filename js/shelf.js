@@ -65,9 +65,12 @@ export async function renderShelf() {
     </div>`;
   $('#shelfClose').hidden = !state.nb;
   updateBackupNotice();
-  const est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate().catch(() => null) : null;
+  // The notebooks' own size, not navigator.storage.estimate(): the browser's figure includes the
+  // offline copy of the app and only shrinks when it gets round to tidying its database files,
+  // so it seemed to go up and never down, even after deleting notebooks.
+  const bytes = notebooks.reduce((n, nb) => n + (nb.size || 0), 0);
   $('#storageInfo').textContent = `${notebooks.length} notebook${notebooks.length === 1 ? '' : 's'}` +
-    (est && est.usage ? ` · using ${mb(est.usage)} of this browser's storage` : '') +
+    (notebooks.length ? ` · about ${mb(bytes)}` : '') +
     ' · saved automatically on this device';
 }
 
