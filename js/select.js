@@ -1,4 +1,5 @@
-/* Select tool: lasso strokes (and pictures), then move, resize, recolour, duplicate or delete them.
+/* Select tool: lasso strokes (and pictures and text), then move, resize, recolour, duplicate or delete them.
+   Text moves line to line; resizing it changes where it wraps, not its size (that comes from the paper).
    Strokes are never changed in place (undo keeps references to the old ones):
    a move or resize swaps in transformed copies, as one undoable step. */
 import { PEN_COLOURS, HL_COLOURS } from './config.js';
@@ -7,6 +8,7 @@ import { $ } from './util.js';
 import { view, sheetFor, clearLive, renderInkFor, setOverlay } from './board.js';
 import { drawStroke, tracePath } from './draw.js';
 import { pushUndo } from './history.js';
+import { guide, textBox, layout } from './text.js';
 import { scheduleSave } from './storage.js';
 
 const ACCENT = '#2b59cf', PAD = 2.5, HANDLE = 2.4;   // mm
@@ -16,9 +18,11 @@ let sel = null;            // { pg, strokes: [...], box: { x0, y0, x1, y1 } }
 export const hasSelection = () => !!sel;
 
 /* --- geometry --- */
-function boxOf(strokes) {
+const isText = s => s.t === 'text';
+function boxOf(strokes, pg) {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const s of strokes) {
+    if (isText(s)) { const b = textBox(pg, s); x0 = Math.min(x0, b.x0); y0 = Math.min(y0, b.y0); x1 = Math.max(x1, b.x1); y1 = Math.max(y1, b.y1); continue; }
     if (isImg(s)) { x0 = Math.min(x0, s.x); y0 = Math.min(y0, s.y); x1 = Math.max(x1, s.x + s.w); y1 = Math.max(y1, s.y + s.h); continue; }
     const h = s.w / 2;
     for (let i = 0; i < s.p.length; i += 3) {
@@ -36,7 +40,8 @@ function inside(x, y, poly) {                  // ray casting; poly = flat [x, y
   }
   return c;
 }
-function nearStroke(s, x, y, r) {
+function nearStroke(s, x, y, r, pg) {
+  if (isText(s)) { const b = textBox(pg, s); return x >= b.x0 - r && x <= b.x1 + r && y >= b.y0 - r && y <= b.y1 + r; }
   if (isImg(s)) return x >= s.x - r && x <= s.x + s.w + r && y >= s.y - r && y <= s.y + s.h + r;
   const p = s.p, rr = r + s.w / 2;
   if (p.length === 3) return Math.hypot(p[0] - x, p[1] - y) <= rr;
@@ -48,22 +53,29 @@ function nearStroke(s, x, y, r) {
   return false;
 }
 const r2 = v => Math.round(v * 100) / 100;
-function map(s, f) {
+function map(s, f, pg) {
+  if (isText(s)) {                             // its first line's start point moves; the row may be fractional until it's dropped
+    const g = guide(pg), [x0, y0] = f(s.x, g.base(s.r)), [x1] = f(s.x + s.w, g.base(s.r));
+    return { ...s, x: r2(x0), r: Math.max(0, g.rowAt(y0)), w: r2(Math.max(10, x1 - x0)) };
+  }
   if (isImg(s)) { const [x0, y0] = f(s.x, s.y), [x1, y1] = f(s.x + s.w, s.y + s.h); return { ...s, x: r2(x0), y: r2(y0), w: r2(x1 - x0), h: r2(y1 - y0) }; }
   return mapPts(s, f);
 }
-/* Points a lasso tests: a stroke's own points, or a 3 × 3 grid over a picture. */
-const samples = s => isImg(s) ? [0, 0.5, 1].flatMap(i => [0, 0.5, 1].flatMap(j => [s.x + i * s.w, s.y + j * s.h, 0])) : s.p;
+const settle = s => isText(s) ? { ...s, r: Math.round(s.r) } : s;   // text drops onto the nearest line
+/* Points a lasso tests: a stroke's own points, or a 3 × 3 grid over a picture or text. */
+const grid3 = b => [0, 0.5, 1].flatMap(i => [0, 0.5, 1].flatMap(j => [b.x0 + i * (b.x1 - b.x0), b.y0 + j * (b.y1 - b.y0), 0]));
+const samples = (s, pg) => isText(s) ? grid3(textBox(pg, s)) : isImg(s) ? [0, 0.5, 1].flatMap(i => [0, 0.5, 1].flatMap(j => [s.x + i * s.w, s.y + j * s.h, 0])) : s.p;
 const mapPts = (s, f) => { const p = s.p.slice(); for (let i = 0; i < p.length; i += 3) { const [x, y] = f(p[i], p[i + 1]); p[i] = Math.round(x * 100) / 100; p[i + 1] = Math.round(y * 100) / 100; } return { ...s, p }; };
 const moveBy = (dx, dy) => (x, y) => [x + dx, y + dy];
 const scaleFrom = (ox, oy, k) => (x, y) => [ox + (x - ox) * k, oy + (y - oy) * k];
 
 /* --- drawing the selection (on the page's live canvas) --- */
-function paint(sheet, strokes, box) {
+function paint(sheet, strokes, box, pg) {
   const ctx = sheet.ctxLive;
   clearLive(sheet);
   ctx.save();
   for (const s of strokes) {                   // tint what's selected
+    if (isText(s)) { const b = textBox(pg, s); ctx.globalAlpha = 0.12; ctx.fillStyle = ACCENT; ctx.fillRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0); continue; }
     if (isImg(s)) { ctx.globalAlpha = 0.5; ctx.strokeStyle = ACCENT; ctx.lineWidth = 0.8; ctx.strokeRect(s.x, s.y, s.w, s.h); continue; }
     ctx.globalAlpha = 0.35; ctx.strokeStyle = ACCENT; ctx.lineWidth = s.w + 0.8; ctx.lineCap = ctx.lineJoin = 'round';
     tracePath(ctx, s.p); ctx.stroke();
@@ -80,6 +92,7 @@ function paint(sheet, strokes, box) {
 function placeBar(sheet) {
   const r = sheet.el.getBoundingClientRect(), b = sel.box, k = view.scale;
   bar.hidden = false;
+  bar.querySelector('[data-act="selEdit"]').hidden = !selectedText();
   const w = bar.offsetWidth, h = bar.offsetHeight;
   let top = r.top + b.y0 * k - h - 10;
   if (top < 8) top = r.top + b.y1 * k + 14;
@@ -91,13 +104,13 @@ function redraw() {
   if (!sel) return;
   const sheet = sheetFor(sel.pg);
   if (!sheet || !state.pages.includes(sel.pg) || !sel.strokes.every(s => sel.pg.strokes.includes(s))) { clearSelection(); return; }
-  paint(sheet, sel.strokes, sel.box);
+  paint(sheet, sel.strokes, sel.box, sel.pg);
   placeBar(sheet);
 }
 setOverlay(redraw);
 
 function select(pg, strokes) {
-  sel = strokes.length ? { pg, strokes, box: boxOf(strokes) } : null;
+  sel = strokes.length ? { pg, strokes, box: boxOf(strokes, pg) } : null;
   if (sel) redraw(); else bar.hidden = true;
 }
 export function clearSelection() {
@@ -113,7 +126,7 @@ function replace(changes) {
   pg.strokes = before.map(s => changes.get(s) || s);
   pushUndo(pg, before);
   sel.strokes = sel.strokes.map(s => changes.get(s) || s);
-  sel.box = boxOf(sel.strokes);
+  sel.box = boxOf(sel.strokes, pg);
   renderInkFor(pg);
   scheduleSave();
 }
@@ -144,10 +157,10 @@ export function selMove(g, [x, y]) {
     return;
   }
   if (!g.moving) { g.moving = true; renderInkFor(g.pg, new Set(sel.strokes)); }   // lift the selection off the page
-  const f = transformFor(g, x, y), moved = sel.strokes.map(s => map(s, f));
-  paint(g.sheet, moved, boxOf(moved));
+  const f = transformFor(g, x, y), moved = sel.strokes.map(s => map(s, f, g.pg));
+  paint(g.sheet, moved, boxOf(moved, g.pg), g.pg);
   g.sheet.ctxLive.save();
-  moved.forEach(s => drawStroke(g.sheet.ctxLive, s));
+  moved.forEach(s => drawStroke(g.sheet.ctxLive, s, g.pg));
   g.sheet.ctxLive.restore();
 }
 export function selUp(g, [x, y]) {
@@ -156,12 +169,12 @@ export function selUp(g, [x, y]) {
     let len = 0;
     for (let i = 2; i < pts.length; i += 2) len += Math.hypot(pts[i] - pts[i - 2], pts[i + 1] - pts[i - 1]);
     if (len < 3) {                                       // a tap: pick the stroke under it
-      const top = [...g.pg.strokes].reverse(), near = s => nearStroke(s, pts[0], pts[1], isImg(s) ? 0 : 2.5);
+      const top = [...g.pg.strokes].reverse(), near = s => nearStroke(s, pts[0], pts[1], isImg(s) || isText(s) ? 0 : 2.5, g.pg);
       const hit = top.find(s => !isImg(s) && near(s)) || top.find(s => isImg(s) && near(s));   // ink sits on top of pictures
       select(g.pg, hit ? [hit] : []);
     } else {                                             // a loop: strokes mostly inside it
       select(g.pg, g.pg.strokes.filter(s => {
-        const p = samples(s);
+        const p = samples(s, g.pg);
         let n = 0;
         for (let i = 0; i < p.length; i += 3) if (inside(p[i], p[i + 1], pts)) n++;
         return n / (p.length / 3) >= 0.5;
@@ -173,7 +186,7 @@ export function selUp(g, [x, y]) {
   if (!sel) return;
   if (!g.moving) { redraw(); return; }                  // a tap inside the selection: nothing to do
   const f = transformFor(g, x, y);
-  replace(new Map(sel.strokes.map(s => [s, map(s, f)])));
+  replace(new Map(sel.strokes.map(s => [s, settle(map(s, f, g.pg))])));
 }
 
 /* --- actions --- */
@@ -187,13 +200,14 @@ export function deleteSelection() {
 }
 export function duplicateSelection() {
   if (!sel) return;
-  const pg = sel.pg, copies = sel.strokes.map(s => map(s, moveBy(6, 6))), before = pg.strokes;
+  const pg = sel.pg, before = pg.strokes;
+  const copies = sel.strokes.map(s => isText(s) ? { ...s, r: s.r + layout(pg, s).all } : map(s, moveBy(6, 6), pg));   // text: on the lines below it
   pg.strokes = before.concat(copies);
   pushUndo(pg, before);
-  sel.strokes = copies; sel.box = boxOf(copies);
+  sel.strokes = copies; sel.box = boxOf(copies, pg);
   renderInkFor(pg); scheduleSave();
 }
-/* Recolours the selection: pen strokes take pen colour i, highlights take highlighter colour i. */
+/* Recolours the selection: pen strokes and text take pen colour i, highlights take highlighter colour i. */
 export function recolourSelection(i) {
   if (!sel) return;
   const ink = sel.strokes.filter(s => !isImg(s));                  // pictures keep their colours
@@ -201,3 +215,5 @@ export function recolourSelection(i) {
 }
 /* Selects these items on a page (a picture just inserted). The Select tool must already be on. */
 export function selectItems(pg, items) { select(pg, items); }
+/* The selected text block, if the selection is exactly one: { pg, item }. */
+export const selectedText = () => sel && sel.strokes.length === 1 && isText(sel.strokes[0]) ? { pg: sel.pg, item: sel.strokes[0] } : null;

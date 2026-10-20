@@ -1,6 +1,7 @@
 /* Pure drawing: paper templates and ink strokes onto any 2D context already scaled to millimetres.
    Used for the screen, the page thumbnails and the exports. */
 import { pageSize, TOP_GAP, LINE_COL, HL_ALPHA } from './config.js';
+import { drawText } from './text.js';
 
 /* Draws a page's paper onto ctx. k = device pixels per mm. */
 export function drawTemplate(ctx, pg, k) {
@@ -110,14 +111,15 @@ export function drawPaper(ctx, pg, k) {
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
   drawPicture(ctx, pg.bg);
 }
-/* A page's pictures and ink: every picture first, so writing always sits on top of them.
-   skip = a Set of items to leave out. */
-export function drawItems(ctx, items, skip) {
-  for (const s of items) if (s.t === 'img' && !(skip && skip.has(s))) drawPicture(ctx, s);
-  for (const s of items) if (s.t !== 'img' && !(skip && skip.has(s))) drawStroke(ctx, s);
+/* A page's pictures, text and ink, in that order, so writing always sits on top.
+   skip = a Set of items to leave out. pg = the page (text needs its lines). */
+export function drawItems(ctx, items, skip, pg) {
+  const draw = t => { for (const s of items) if ((s.t === t || (t === 'ink' && s.t !== 'img' && s.t !== 'text')) && !(skip && skip.has(s))) drawStroke(ctx, s, pg); };
+  draw('img'); draw('text'); draw('ink');
 }
-export function drawStroke(ctx, s) {
+export function drawStroke(ctx, s, pg) {
   if (s.t === 'img') { drawPicture(ctx, s); return; }
+  if (s.t === 'text') { drawText(ctx, pg, s); return; }
   if (s.t === 'hl') {
     ctx.save();
     ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = HL_ALPHA;

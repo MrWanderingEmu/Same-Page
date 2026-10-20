@@ -16,6 +16,8 @@ import { hideDot } from './laser.js';
 import { toggleRuler } from './ruler.js';
 import { toggleCover, renderCovers } from './cover.js';
 import { pastePicture, choosePictureFile } from './images.js';
+import { openText, closeText, textOpen, setTextStyle, setTextColour } from './textbox.js';
+import { selectedText } from './select.js';
 
 /* --- tools --- */
 export function buildSwatches() {
@@ -43,7 +45,14 @@ export function renderTools() {
   $('#sizes').classList.toggle('dim', laser || state.tool === 'select');
   if (!er) hideEraser();
 }
-function setTool(t) { state.tool = t; state.insert = null; renderTools(); scheduleSave(); }
+function setTool(t) { if (textOpen()) closeText(true); state.tool = t; state.insert = null; renderTools(); scheduleSave(); }
+/* Insert › Text: the next tap on a page says where the text starts. */
+function chooseText() {
+  closePops();
+  if (state.tool !== 'text') state.prevTool = ['eraser', 'insert', 'laser'].includes(state.tool) ? 'pen' : state.tool;
+  state.tool = 'text'; state.insert = null; renderTools();
+  toast('Tap the page where the text should start, or tap some text to change it.');
+}
 
 /* --- insert tool --- */
 const ICON_BOX = { Shapes: [[9, 5], [39, 35]], Organisers: [[3, 3], [45, 37]] };
@@ -56,12 +65,13 @@ const PICTURE_ICONS = {
   pastePic: '<rect x="13" y="7" width="22" height="28" rx="2.5"/><path d="M19 7V5h10v2"/><rect x="18" y="16" width="12" height="10" rx="1"/><path d="M18 24l3.5-3.5 3 3 2-2 3.5 3.5"/>',
   filePic: '<rect x="8" y="7" width="32" height="26" rx="2.5"/><circle cx="17" cy="15" r="2.6"/><path d="M8 29l10-9 7 6 5-4 10 8"/>',
   pdfPages: '<path d="M14 4h14l8 8v24H14z"/><path d="M28 4v8h8"/><path d="M19 19h12M19 24h12M19 29h8"/>',
+  text: '<path d="M8 31h32" stroke-dasharray="1.5 2"/><path d="M14 27l6-17h1l6 17M16.5 21h8"/><path d="M31 18c2-1.5 5-1.5 5.5 1v8M36.5 23c-3-1-6 0-6 2.2 0 2.6 4 2.6 6 .3"/>',
 };
 function renderInsertPop() {
   const groups = [...new Set(INSERTS.map(i => i.group))];
-  const pics = [['pastePic', 'Paste picture'], ['filePic', 'Picture file'], ['pdfPages', 'PDF pages']].map(([act, label]) =>
+  const pics = [['pastePic', 'Paste picture'], ['filePic', 'Picture file'], ['pdfPages', 'PDF pages'], ['text', 'Text']].map(([act, label]) =>
     `<button class="ins" data-act="${act}"><svg viewBox="0 0 48 40">${PICTURE_ICONS[act]}</svg>${label}</button>`).join('');
-  $('#insertPop').innerHTML = `<div class="group">Pictures</div><div class="inserts">${pics}</div>` + groups.map(g => `<div class="group">${g}</div><div class="inserts">${INSERTS.filter(i => i.group === g).map(i =>
+  $('#insertPop').innerHTML = `<div class="group">Pictures, PDFs and text</div><div class="inserts">${pics}</div>` + groups.map(g => `<div class="group">${g}</div><div class="inserts">${INSERTS.filter(i => i.group === g).map(i =>
     `<button class="ins${state.tool === 'insert' && state.insert === i.id ? ' on' : ''}" data-insert="${i.id}">${insertIcon(i)}${i.label}</button>`).join('')}</div>`).join('') +
     '<p class="note" style="margin:0">Pick one, then drag a box on the page. For an organiser, tap the page instead to fill it (a Venn fills the half you tap).</p>';
 }
@@ -137,7 +147,7 @@ export const paperPopOpen = () => $('#paperPop').classList.contains('open');
 const PREVIEW = { ruled: 14, thirds: 9, thirds2: 9, sky: 9, grid: 15 };
 const NOTES = {
   thirds: 'Each row: solid top line, dotted middle line, solid base line, then a space for tails.',
-  thirds2: 'Each row: solid line, two dotted lines, solid line. Letters sit on the lower dotted line and tails drop to the solid line.',
+  thirds2: 'Each row: solid line, two dotted lines, solid line. Letters rest on the bottom solid line: small letters fill the bottom third, tall letters reach into the middle third, and tails hang below the line.',
   sky: 'Tall letters reach up into the sky, small letters sit on the grass, and tails dig down into the dirt.',
   blank: 'A plain page with no lines.',
 };
@@ -233,12 +243,14 @@ function onClick(e) {
   if (b.dataset.colour != null) {
     const i = +b.dataset.colour;
     if (state.tool === 'select' && hasSelection()) { recolourSelection(i); return; }
+    if (state.tool === 'text') { state.penColour = i; setTextColour(PEN_COLOURS[i]); renderTools(); scheduleSave(); return; }
     if (state.tool === 'hl') state.hlColour = i;
     else { state.penColour = i; if (state.tool !== 'insert') state.tool = 'pen'; }
     renderTools(); scheduleSave(); return;
   }
   if (b.dataset.size != null) { state.size[sizeKey()] = +b.dataset.size; renderTools(); scheduleSave(); return; }
   if (b.dataset.insert) return chooseInsert(b.dataset.insert);
+  if (b.dataset.tstyle) return setTextStyle(b.dataset.tstyle);
   if (b.dataset.act === 'insert') { renderInsertPop(); showPop($('#insertPop'), b); return; }
   if (b.dataset.snap) { state.snap = b.dataset.snap === 'on'; updateMenu(); scheduleSave(); return; }
   if (b.dataset.tpl) return setTemplate(b.dataset.tpl);
@@ -264,6 +276,10 @@ function onClick(e) {
     case 'ruler': return toggleRuler();
     case 'pastePic': return pastePicture();
     case 'filePic': return choosePictureFile();
+    case 'text': return chooseText();
+    case 'textDone': return closeText(true);
+    case 'textCancel': return closeText(false);
+    case 'selEdit': { const t = selectedText(); if (t) openText(t.pg, { item: t.item }); return; }
     case 'pdfPages': closePops(); return $('#pdfInput').click();
     case 'cover': return toggleCover();
     case 'view': state.view = state.view === 'page' ? 'width' : 'page'; updateViewBtns(); stage.scrollTop = 0; layout(); scheduleSave(); return;
@@ -277,7 +293,7 @@ function onClick(e) {
 /* --- keyboard --- */
 function onKey(e) {
   if (shelfOpen()) { if (e.key === 'Escape') shelfEscape(); return; }
-  if (e.target.tagName === 'INPUT') return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
   const ctrl = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
   if (ctrl && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if (ctrl && k === 'y') { e.preventDefault(); redo(); return; }
@@ -311,5 +327,5 @@ export function initUI() {
     if (!document.fullscreenElement && presentFs && state.presenting) { presentFs = false; togglePresent(); }
   });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveNow(); });
-  document.addEventListener('selectstart', e => { if (e.target.tagName !== 'INPUT') e.preventDefault(); });
+  document.addEventListener('selectstart', e => { if (!/^(INPUT|TEXTAREA)$/.test(e.target.tagName)) e.preventDefault(); });
 }

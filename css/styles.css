@@ -276,3 +276,18 @@ body.shelf-open #shelf{display:flex}
   #print img{display:block;width:210mm;height:296mm;break-after:page;page-break-after:always}
   #print img:last-child{break-after:auto;page-break-after:auto}
 }
+
+/* Typed text: school handwriting fonts (vendor/fonts, OFL) and the text panel (textbox.js) */
+@font-face{font-family:"Same Page Print";src:url(../vendor/fonts/edu-au-vic-wa-nt-pre-500.woff2) format("woff2");font-display:swap}
+@font-face{font-family:"Same Page Cursive";src:url(../vendor/fonts/playwrite-au-vic-400.woff2) format("woff2");font-display:swap}
+#textPanel{position:fixed;left:12px;top:12px;z-index:7;width:min(400px,calc(100vw - 24px));
+  background:#fff;border-radius:14px;padding:10px;box-shadow:0 6px 24px rgba(0,0,0,.16),0 1px 3px rgba(0,0,0,.1);display:flex;flex-direction:column;gap:8px}
+#textPanel[hidden]{display:none}
+#textStyles button{font-size:17px}
+#selbar button[hidden]{display:none}
+#textIn{-webkit-user-select:text;user-select:text;font:15px/1.4 "Segoe UI",system-ui,sans-serif;border:1px solid #dcd6ca;border-radius:9px;padding:8px 10px;resize:vertical;min-height:70px;color:inherit;outline:none}
+#textIn:focus{border-color:var(--accent)}
+#textNote{margin:0}
+.tp-foot{display:flex;justify-content:flex-end;gap:6px}
+.tp-foot button{border:0;border-radius:9px;padding:9px 16px;font:inherit;font-size:14px;cursor:pointer;background:#f1eee8;color:inherit;touch-action:manipulation}
+.tp-foot button.primary{background:var(--accent);color:#fff;font-weight:600}

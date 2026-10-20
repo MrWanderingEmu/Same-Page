@@ -12,6 +12,7 @@ import { addImage } from './assets.js';
 import { selectItems } from './select.js';
 import { renderTools, closePops } from './ui.js';
 import { importPdf } from './pdf.js';
+import { openText, textOpen } from './textbox.js';
 
 const MAX_AT_ONCE = 10;
 const NO_PICTURE = 'There’s no picture to paste. Copy one first: use the Snipping Tool, or right-click a picture and choose Copy image.';
@@ -85,7 +86,8 @@ function onPaste(e) {
   if (files.length) { e.preventDefault(); insertPictures(files); return; }
   const src = imgSrc(cd.getData('text/html')), text = cd.getData('text/plain');
   if (src) { e.preventDefault(); fromLink(src); return; }
-  if (looksLikeImageLink(text)) { e.preventDefault(); fromLink(text.trim()); }
+  if (looksLikeImageLink(text)) { e.preventDefault(); fromLink(text.trim()); return; }
+  if (text && text.trim() && !textOpen()) { e.preventDefault(); openText(page(), { text: text.trim() }); }   // words: onto the lines
 }
 
 /* Insert › Paste picture: reads the clipboard without a keyboard (the browser asks once). */

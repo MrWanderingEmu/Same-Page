@@ -188,8 +188,16 @@
 
 <!-- Actions for a lasso selection -->
 <div id="selbar" hidden>
+  <button data-act="selEdit" hidden><svg viewBox="0 0 24 24"><path d="M5 19h4L19.5 8.5l-4-4L5 15z"/><path d="M13.5 6.5l4 4"/></svg>Edit</button>
   <button data-act="selDup"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5.5A1.5 1.5 0 0014.5 4h-9A1.5 1.5 0 004 5.5v9A1.5 1.5 0 005.5 16H8"/></svg>Duplicate</button>
   <button data-act="selDel" class="danger"><svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9.5 7V4.5h5V7"/><path d="M6.5 7l1 13h9l1-13"/></svg>Delete</button>
+</div>
+<!-- Typing text onto the page's lines (textbox.js) -->
+<div id="textPanel" role="dialog" aria-label="Text" hidden>
+  <div class="seg" id="textStyles"></div>
+  <textarea id="textIn" rows="4" placeholder="Type or paste the text here" spellcheck="true"></textarea>
+  <p class="note" id="textNote"></p>
+  <div class="tp-foot"><button data-act="textCancel">Cancel</button><button data-act="textDone" class="primary">Done</button></div>
 </div>
 <div id="laserdot"></div>
 <div id="rulerlayer" hidden><div id="ruler"><svg viewBox="0 0 320 36" preserveAspectRatio="none"></svg><span class="angle" hidden></span></div></div>

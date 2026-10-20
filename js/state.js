@@ -1,6 +1,7 @@
 /* App state, the page model, and which pages are on screen. */
 import { TEMPLATES, pageSize } from './config.js';
 import { clamp, uid } from './util.js';
+import { cleanText } from './text.js';
 
 export const state = {
   nb: null,              // the open notebook: { id, title, colour, created, updated }
@@ -12,6 +13,7 @@ export const state = {
   // Saved once for the whole app:
   tool: 'pen', penColour: 0, hlColour: 0,
   insert: null,          // the shape or organiser the Insert tool will place (see shapes.js)
+  textStyle: 'print',    // the last text style used: 'print' | 'cursive' | 'plain' (text.js)
   prevTool: 'pen',       // tool to go back to after inserting
   snap: true,            // hold the pen still at the end of a stroke to snap it to a shape
   size: { pen: 1, hl: 1, eraser: 1 },
@@ -63,9 +65,11 @@ export const hasInk = () => state.pages.some(p => p.strokes.length);
 
 /* A stroke: { t:'pen'|'hl', c:colour, w:width mm, pr:pressure-on, p:[x,y,pressure, x,y,pressure, ...] }
    A picture lives in the same list, so Undo, Select and saving treat it like ink:
-   { t:'img', a:asset id (assets.js), x, y, w, h } in mm. It's always drawn under the ink. */
+   { t:'img', a:asset id (assets.js), x, y, w, h } in mm. It's always drawn under the ink.
+   So does a block of typed text (text.js): { t:'text', s, f, c, x, r, w }. */
 export const isImg = s => s.t === 'img';
 export function validStroke(s) {
+  if (s && s.t === 'text') return !!cleanText(s);
   if (s && s.t === 'img') return typeof s.a === 'string' && [s.x, s.y, s.w, s.h].every(isFinite) && s.w > 0 && s.h > 0;
   return s && Array.isArray(s.p) && s.p.length >= 3 && s.p.length % 3 === 0 &&
     typeof s.c === 'string' && isFinite(s.w) && (s.t === 'pen' || s.t === 'hl');

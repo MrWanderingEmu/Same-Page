@@ -24,7 +24,8 @@ Same Page is a stylus whiteboard for teachers whose pages match the students' ex
 | `e22bfe4` | **Reveal cover** and the **smoke test** page (details below) |
 | `7964c31` | **Toolbar palm guard** and the shelf's storage figure (details below) |
 | `ae78d2c` | **Pictures:** paste, Paste picture button, files, drag and drop (details below) |
-| *(next)* | **PDF pages** (details below) |
+| `81260fb` | **PDF pages** (details below) |
+| *(next)* | **Text on the lines** (details below) |
 
 ## First classroom test (19 Oct 2026) and what changed
 
@@ -41,7 +42,7 @@ The teacher used it with a class on the Lifebook with a stylus, and preferred it
 The teacher picked this next. Their choices: prepared ahead and saved with the page (not a lesson-only overlay); one sheet sliding down from the top (not tap-away boxes); snapping to the paper's lines; revealed by pen or finger (no clicker).
 
 - `pg.cover` is the cover's top edge in mm, or `null`. It's saved in page records and notebook files, but isn't part of the paper, so new pages and *Use this paper on all pages* don't copy it. It isn't in Undo either, like the laser.
-- `coverStops(pg)` in `cover.js` gives where it can rest. Ruled: 0.3 of a line gap under each line, leaving room for tails. Thirds: a whole row at a time, just above the next head line. Two dotted and sky: just under each row's bottom line. Grid: each line. Blank: every 10 mm. The first stop shows only the heading area.
+- `coverStops(pg)` in `cover.js` gives where it can rest. Ruled: 0.3 of a line gap under each line, leaving room for tails. Thirds: a whole row at a time, just above the next head line. Two dotted: just below the next row's upper dotted line, since tails hang into it. Sky: just under each row's bottom line. Grid: each line. Blank: every 10 mm. The first stop shows only the heading area.
 - Tap the tab = next stop (the last one takes it off). Drag = settles on the nearest stop, or comes off if pulled to the bottom. Only the tab moves it; pointer-down on the covered area does nothing (one hint toast), and the eraser skips covered points.
 - The card is a DOM element inside each sheet, so it follows the page; exports draw the canvases only, so it never prints.
 - Known gap: a Select lasso started above the cover can still pick up strokes under it.
@@ -75,6 +76,22 @@ Colleague request: put in a PDF and write on it. The teacher said PDFs would be 
 - **Limits:** 10 pages at a time (`MAX_PAGES`); for a longer PDF a `prompt()` asks which pages ("1-3, 5"), parsed by `parsePages`. Files over 60 MB are refused. Password-protected PDFs get their own message.
 - **PDF.js** (`vendor/pdfjs/`, 4.10.38, checksum checked against npm) is loaded with a dynamic `import()` only the first time a PDF is opened. It isn't in the service worker's precache list (it's about 2 MB), but the worker caches every file it fetches, so it works offline after its first use. The `.mjs` files were renamed `.js` so any static host serves them with a JavaScript type. `standard_fonts/` is there for PDFs that use non-embedded fonts like Helvetica. The CJK `cmaps/` were left out. `.gitattributes` keeps `vendor/` byte-for-byte.
 - **Not undoable:** adding PDF pages works like *Add page*, which isn't in Undo either. Delete the page to remove it.
+
+## Text on the lines (20 Oct 2026)
+
+The teacher's idea: paste text and have it line up with the page's lines. Their school uses Sassoon Primary (or similar: closed loops, a plain 'a') in the early years, Victorian Modern Cursive from Years 3/4, and something like Arial for older students.
+
+- **Fonts (`vendor/fonts`, both OFL):** Sassoon and Victorian Modern Cursive are paid fonts. *Print* is **Edu AU VIC WA NT Pre** (Medium), the label print taught in Victoria, WA and the NT, with closed shapes, a single-storey a and small exit flicks. *Cursive* is **Playwrite AU VIC**, Google's font based on Victorian Modern Cursive. *Plain* is Arial from the system. Neither free font joins its letters (the joined Edu builds aren't published), so cursive comes out as unjoined cursive letterforms. A paid joined font could be dropped in later as `Same Page Cursive` in `styles.css`.
+- **A text block is an item in `pg.strokes`:** `{ t:'text', s, f, c, x, r, w }`. It stores the row its first line sits on (`r`), not a y position, and no size. `guide(pg)` in `text.js` works out the rows and small-letter height from the paper when it's drawn, so changing the paper or spacing moves the text onto the new lines, and Undo still works. Rows by paper:
+  - ruled and grid: on each line, small letters 0.42 × the gap
+  - thirds: on the base line, small letters = one third, tall ones to the head line
+  - two dotted: on the bottom solid line, small letters = the bottom third, tall ones into the middle third, tails hanging into the next row (the teacher's correction, 20 Oct)
+  - sky: on the line between grass and dirt, small letters = the grass
+  - blank and PDF pages: as if ruled at 8 mm
+- **Font size** = small-letter height ÷ the font's measured x-height ratio, measured once the fonts have loaded (`loadFonts` redraws when they arrive). Text is drawn at 10× and scaled down, so small sizes stay accurate.
+- **Drawing order:** pictures, then text, then ink, so writing always goes over typed text. The eraser skips text, as it does pictures. Select moves text with a fractional row while dragging and snaps to the nearest line on release (`settle`). The corner handle changes the wrap width, not the size. Duplicate puts the copy on the lines below. Recolour works.
+- **Panel (`textbox.js`):** it sits beside the page when there's at least 260 px of desk, otherwise at the top or bottom of the screen, away from the words. A tap with the Text tool moves where the block starts, and tapping existing text opens it. Ctrl+V with words on the clipboard (and no picture) opens the panel with them. An empty block on Done is removed. Choosing another tool counts as Done. The panel warns when lines run off the bottom of the page; those lines aren't drawn.
+- **`drawStroke(ctx, s, pg)` and `drawItems(ctx, items, skip, pg)` now take the page,** because text needs its lines. Pass it everywhere.
 
 The features themselves, and the keyboard shortcuts, are described in [README.md](README.md).
 
@@ -124,12 +141,11 @@ The features themselves, and the keyboard shortcuts, are described in [README.md
 
 ## Possible next steps (rough priority)
 
-1. **Real-device check** of the toolbar palm guard and pictures, and tune the timings above from real use.
-2. **Text that sits on the lines:** paste or type text that flows onto the paper's lines from where you tap, sized to the paper and wrapping at the margin. Three styles: a Sassoon Primary-like print (closed loops, a plain 'a') for the early years, a Victorian Modern Cursive-like hand from Years 3/4, and a plain font like Arial for older students. Check font licences: free look-alikes may be needed.
-3. **Writing replay:** replay a page stroke by stroke to show letter formation or the order of a method. Stroke order is already stored.
-4. **Page overview** (colleague request): thumbnails of every page, to jump to one or drag to reorder; move or copy pages to another notebook; add a whole notebook into this one. Pictures come along for free, since pages only refer to them.
-5. **Protractor** overlay for modelling angles (the ruler is done). Maybe two-finger twist to turn the ruler.
-6. **Quick notebook switcher** in the toolbar. It was offered alongside the shelf, but the teacher chose the shelf only.
-7. ~~Linked OneDrive folder~~: parked on 20 Oct 2026 at the teacher's request.
-8. **Copy and paste between pages and notebooks;** drag a selection across the spine.
-9. **More automated tests:** the smoke test covers the basics; still untested are shape recognition, storage migration, and backup/restore.
+1. **Real-device check** of the toolbar palm guard, pictures, PDF pages and text (does the touch keyboard cover the panel? do the fonts look right on the board?), and tune the timings above from real use.
+2. **Writing replay:** replay a page stroke by stroke to show letter formation or the order of a method. Stroke order is already stored.
+3. **Page overview** (colleague request): thumbnails of every page, to jump to one or drag to reorder; move or copy pages to another notebook; add a whole notebook into this one. Pictures come along for free, since pages only refer to them.
+4. **Protractor** overlay for modelling angles (the ruler is done). Maybe two-finger twist to turn the ruler.
+5. **Quick notebook switcher** in the toolbar. It was offered alongside the shelf, but the teacher chose the shelf only.
+6. ~~Linked OneDrive folder~~: parked on 20 Oct 2026 at the teacher's request.
+7. **Copy and paste between pages and notebooks;** drag a selection across the spine.
+8. **More automated tests:** the smoke test covers the basics; still untested are shape recognition, storage migration, and backup/restore.

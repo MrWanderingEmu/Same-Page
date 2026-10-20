@@ -9,8 +9,9 @@ A modelling whiteboard for teachers whose pages match the students' exercise boo
 - **Insert** shapes (line, arrow, rectangle, circle, triangles) and graphic organisers (T-chart, Venn, three-circle Venn, Y-chart, three columns, Frayer model, 2 × 2 grid, story mountain, mind map, number line, sequence). Drag a box to place one, or tap to fill the page (a Venn fills the top or bottom half, whichever you tap). They're drawn in pen ink, so Undo and the eraser work on them.
 - **Pictures:** press **Ctrl+V** to paste a screenshot (Snipping Tool) or a picture copied from a website (right-click it › *Copy image*). Without a keyboard, use *Insert › Paste picture*. *Insert › Picture file* adds saved pictures, or drag one onto the page. A picture lands selected, ready to move or resize, and sits under the ink, so you can write and highlight on it. The eraser leaves pictures alone; remove one with *Select › Delete*. Big pictures are shrunk (to 1600 pixels on the longest side), and each is stored only once, however many pages use it.
 - **PDF pages:** *Insert › PDF pages* (or drag a PDF onto the page) adds each page of a worksheet as a new page after the one you're on, the right way round, ready to write on. Up to 10 pages at a time; for a longer PDF it asks which pages. The PDF takes the place of the paper, so Select and the eraser can't move or rub it out, and *Clear* wipes the writing but keeps the worksheet. To remove it, delete the page.
+- **Text on the lines:** *Insert › Text*, then tap where it should start (or just paste words with **Ctrl+V**). Type or paste in the panel and the words settle onto the paper's lines as you go: on thirds and sky-grass-dirt paper the small letters fill the middle band, tall letters reach the top and tails drop below, like a student's writing. Three styles: *Print* (Edu AU VIC WA NT Pre, label print as taught in Victoria), *Cursive* (Playwrite AU VIC, based on Victorian Modern Cursive) and *Plain* (Arial). Change the paper or its spacing and the text moves onto the new lines. Select moves it a line at a time (its corner handle changes where it wraps), *Select › Edit* or a tap with the Text tool changes the words, and the eraser leaves typed text alone so you can rub out what you write over it. **Ctrl+Enter** is Done, **Esc** cancels.
 - **Ruler** (**R**): a see-through 30 cm ruler at true size. Start a pen or highlighter stroke along either long edge and it comes out dead straight, for modelling ruling up a margin or underlining. Drag the ruler to move it; drag the round knob to turn it (it clicks to level, upright and 45°), or tap the knob to swap between level and upright.
-- **Select:** draw a loop round anything (or tap one line or a picture) to select it, then drag to move it, drag the corner handle to resize, tap a colour to recolour, or use *Duplicate* / *Delete*.
+- **Select:** draw a loop round anything (or tap one line, a picture or some text) to select it, then drag to move it, drag the corner handle to resize, tap a colour to recolour, or use *Duplicate* / *Delete*.
 - **Reveal cover:** *Cover* (right toolbar) lays a card over the page below the heading. Drag its tab to where the reveal should start; in class, tap the tab to uncover one line (or one row of thirds) at a time, or drag it to uncover several or hide them again. It always settles on a line. The cover is saved with the page, so a worked example can be prepared ahead. The pen and eraser do nothing on the covered part, and saved images and prints leave the cover off.
 - **Laser pointer:** a glowing red dot follows the pen, and anything you draw with it fades away a moment later. Nothing is saved.
 - **Double-tap a page** (pen or finger) to focus on it from two-page view; double-tap again to see both pages.
@@ -32,6 +33,8 @@ A modelling whiteboard for teachers whose pages match the students' exercise boo
 | ↑ ↓ ← → / PgUp PgDn | Previous / next page (or pair of pages) |
 | Ctrl+Z / Ctrl+Y | Undo / redo |
 | Ctrl+S | Save this notebook to a file |
+| Ctrl+V | Paste a picture, or words (they go onto the lines) |
+| Ctrl+Enter / Esc | In the text panel: Done / Cancel |
 | Esc | Close a menu, deselect, cancel Insert, leave present mode, or close the shelf |
 
 ## Running it on your computer
@@ -70,6 +73,9 @@ js/select.js          lasso selection: move, resize, recolour, duplicate, delete
 js/assets.js          pictures: shrinking, storing each one once, loading, tidying away unused ones
 js/images.js          putting pictures on the page: paste, Paste picture button, files, drag and drop
 js/pdf.js             PDF pages: each page becomes a notebook page, drawn as its paper
+js/text.js            typed text: which line each row sits on for every paper, sizing, wrapping, drawing
+js/textbox.js         the text panel: typing, styles, placing and editing text
+vendor/fonts/         the Print and Cursive handwriting fonts (OFL; see NOTICE.txt)
 vendor/pdfjs/         Mozilla's PDF.js 4.10.38 (Apache 2.0), loaded only when a PDF is opened
 js/laser.js           laser pointer trails and dot
 js/ruler.js           the ruler: moving and turning it, ruling strokes along its edge

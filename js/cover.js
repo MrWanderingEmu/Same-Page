@@ -17,7 +17,9 @@ export function coverStops(pg) {
     for (let y = TOP_GAP - 0.7 * sp; y < H; y += sp) out.push(y);          // just under each line, leaving room for tails
   } else if (t === 'thirds' || t === 'thirds2' || t === 'sky') {
     out.push(TOP_GAP - 1.5);                                                // the heading only
-    for (let y = TOP_GAP + 3 * sp; y < H; y += 3 * sp) out.push(t === 'thirds' ? y - 0.8 : y + 0.6);   // a whole row at a time
+    // A whole row at a time. Two dotted: letters rest on the row's bottom line and their tails hang into
+    // the next row's top third, so stop just below the next row's upper dotted line.
+    for (let y = TOP_GAP + 3 * sp; y < H; y += 3 * sp) out.push(t === 'thirds' ? y - 0.8 : t === 'thirds2' ? y + sp + 0.15 : y + 0.6);
   } else if (t === 'grid') {
     for (let y = (H % sp) / 2 + sp; y < H; y += sp) out.push(y);
   } else {

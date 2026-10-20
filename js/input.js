@@ -22,6 +22,7 @@ import { selDown, selMove, selUp } from './select.js';
 import { laserDown, laserMove, laserUp, showDot, hideDot } from './laser.js';
 import { rulerHit, ruledPoint, rulerDown, rulerMove, rulerUp } from './ruler.js';
 import { coverTabAt, coverDown, coverMove, coverUp, isCovered, coveredHint } from './cover.js';
+import { textTap } from './textbox.js';
 
 let active = null;          // the current gesture
 let lastPen = -1e9;         // time of the last pen event (hover counts)
@@ -87,6 +88,7 @@ function onDown(e) {
   }
   if (isCovered(state.pages[sheet.pi], toPage(e, rect)[1])) { coveredHint(); return; }   // hidden work stays untouched
   setActive(sheet.pi);
+  if (state.tool === 'text' && !wantsEraser(e)) { textTap(state.pages[sheet.pi], toPage(e, rect)); return; }
   if (state.tool === 'select' && !wantsEraser(e)) {
     active = { id: e.pointerId, ptype: e.pointerType, kind: 'select', rect, g: selDown(sheet, toPage(e, rect)) };
     return;
@@ -281,7 +283,7 @@ function commitStrokes({ sheet, pg }, strokes) {
   if (!strokes.length || !state.pages.includes(pg)) return;
   pushUndo(pg, pg.strokes.slice());
   pg.strokes.push(...strokes);
-  if (sheet.kind === 'page' && state.pages[sheet.pi] === pg) strokes.forEach(s => drawStroke(sheet.ctxInk, s));
+  if (sheet.kind === 'page' && state.pages[sheet.pi] === pg) strokes.forEach(s => drawStroke(sheet.ctxInk, s, pg));
   else renderInkFor(pg);
   scheduleSave();
 }
@@ -307,7 +309,7 @@ function segDist(px, py, ax, ay, bx, by) {
   return Math.hypot(px - ax - t * dx, py - ay - t * dy);
 }
 function hits(s, x, y, r) {
-  if (s.t === 'img') return false;          // the eraser rubs out writing on a picture, never the picture (Select › Delete does)
+  if (s.t === 'img' || s.t === 'text') return false;   // the eraser rubs out writing on a picture or typed text, never those (Select › Delete does)
   const b = bbox(s);
   if (x < b[0] - r || x > b[2] + r || y < b[1] - r || y > b[3] + r) return false;
   const p = s.p, n = p.length / 3, rr = r + s.w / 2;

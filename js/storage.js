@@ -10,6 +10,7 @@ import { state, makePage, validStroke, cleanCover, cleanBg } from './state.js';
 import { clamp, toast, uid } from './util.js';
 import { resetHistory } from './history.js';
 import { imageIds, assetBytes, loadAssets } from './assets.js';
+import { cleanText } from './text.js';
 
 const DB_NAME = 'workbook-board';   // the app's original name, kept so existing saved work still loads
 
@@ -57,8 +58,8 @@ export const kvSet = (k, v) => db.write(['kv'], kv => kv.put(v, k));
 
 /* --- pages <-> records --- */
 const img = s => ({ t: 'img', a: s.a, x: s.x, y: s.y, w: s.w, h: s.h });     // a picture is stored as it is
-const encStroke = s => s.t === 'img' ? img(s) : ({ t: s.t, c: s.c, w: s.w, pr: !!s.pr, p: Int32Array.from(s.p, v => Math.round(v * 100)) });
-const decStroke = s => s.t === 'img' ? img(s) : ({ t: s.t, c: s.c, w: s.w, pr: !!s.pr, p: Array.from(s.p || [], v => v / 100) });
+const encStroke = s => s.t === 'img' ? img(s) : s.t === 'text' ? cleanText(s) : ({ t: s.t, c: s.c, w: s.w, pr: !!s.pr, p: Int32Array.from(s.p, v => Math.round(v * 100)) });
+const decStroke = s => s.t === 'img' ? img(s) : s.t === 'text' ? cleanText(s) : ({ t: s.t, c: s.c, w: s.w, pr: !!s.pr, p: Array.from(s.p || [], v => v / 100) });
 
 export function pageRecord(pg, nbId) {
   return { id: pg.id, nb: nbId, tpl: pg.tpl, land: !!pg.land, cover: pg.cover, bg: pg.bg, spacing: { ...pg.spacing }, margin: { ...pg.margin }, strokes: pg.strokes.map(encStroke) };
@@ -66,19 +67,19 @@ export function pageRecord(pg, nbId) {
 export function pageFromRecord(r) {
   const p = makePage(r, r.id);
   p.cover = cleanCover(p, r.cover); p.bg = cleanBg(r.bg);
-  p.strokes = (r.strokes || []).map(decStroke).filter(validStroke);
+  p.strokes = (r.strokes || []).map(decStroke).filter(s => s && validStroke(s));
   return p;
 }
 /* A page from a notebook file (plain arrays). */
 export function pageFromFile(r) {
   const p = makePage(r);
   p.cover = cleanCover(p, r.cover); p.bg = cleanBg(r.bg);
-  p.strokes = Array.isArray(r.strokes) ? r.strokes.filter(validStroke) : [];
+  p.strokes = Array.isArray(r.strokes) ? r.strokes.filter(validStroke).map(s => s.t === 'text' ? cleanText(s) : s) : [];
   return p;
 }
 /* Approximate stored size of the ink and pictures, in bytes (shown on the shelf).
    Each picture counts once, however many pages use it. */
-export const inkBytes = pages => pages.reduce((n, pg) => n + pg.strokes.reduce((m, s) => m + (s.p ? s.p.length * 4 : 0) + 40, 0), 0) +
+export const inkBytes = pages => pages.reduce((n, pg) => n + pg.strokes.reduce((m, s) => m + (s.p ? s.p.length * 4 : s.s ? s.s.length : 0) + 40, 0), 0) +
   imageIds(pages).reduce((n, id) => n + assetBytes(id), 0);
 
 /* Checks a notebook record (from storage or a file) and fills in anything missing. */
@@ -128,8 +129,8 @@ export function metaRecord() {
 }
 
 function prefs() {
-  const { penColour, hlColour, size, finger, pressure, penSeen, snap } = state;
-  return { tool: state.tool === 'insert' ? state.prevTool : state.tool, penColour, hlColour, size, finger, pressure, penSeen, snap };
+  const { penColour, hlColour, size, finger, pressure, penSeen, snap, textStyle } = state;
+  return { tool: state.tool === 'insert' || state.tool === 'text' ? state.prevTool : state.tool, penColour, hlColour, size, finger, pressure, penSeen, snap, textStyle };
 }
 export function applyPrefs(p) {
   if (!p) return;
@@ -140,6 +141,7 @@ export function applyPrefs(p) {
   if (['auto', 'scroll', 'draw'].includes(p.finger)) state.finger = p.finger;
   if (typeof p.pressure === 'boolean') state.pressure = p.pressure;
   if (typeof p.snap === 'boolean') state.snap = p.snap;
+  if (['print', 'cursive', 'plain'].includes(p.textStyle)) state.textStyle = p.textStyle;
   state.penSeen = !!p.penSeen;
 }
 

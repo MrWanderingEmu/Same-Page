@@ -6,6 +6,8 @@ import { stage, layout, sheets } from './board.js';
 import { setPictureSource } from './draw.js';
 import { bitmap, onAssetReady, pruneAssets } from './assets.js';
 import { initImages, insertPictures } from './images.js';
+import { initText } from './textbox.js';
+import { loadFonts } from './text.js';
 import { db, kvGet, migrate, applyPrefs } from './storage.js';
 import { listNotebooks, openNotebook, createNotebook } from './library.js';
 import { undo, redo } from './history.js';
@@ -19,6 +21,8 @@ import { initInput } from './input.js';
   initShelf();
   initInput();
   initImages();
+  initText();
+  loadFonts(() => layout());    // redraw any text once the handwriting fonts have arrived
   // Redraw once a picture on screen has loaded.
   setPictureSource(bitmap);
   let redrawSoon = 0;

@@ -19,7 +19,7 @@ function renderPagesCanvas(pgs, pxPerMm) {
     drawPaper(ctx, pg, pxPerMm);
     ctx.save();
     ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
-    drawItems(ctx, pg.strokes);
+    drawItems(ctx, pg.strokes, null, pg);
     ctx.restore();
     x += W;
   });

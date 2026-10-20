@@ -293,6 +293,54 @@ async function run() {
     } finally { w.prompt = ask; }
   });
 
+  await test('Text: sits on the lines, follows the paper, moves line to line, edits, eraser leaves it', async () => {
+    wb.goPage(0); fresh(); wb.setTemplate('ruled');
+    const T = await w.eval(`import('${new URL('../js/text.js', location.href).href}')`);
+    const texts = () => wb.page().strokes.filter(s => s.t === 'text');
+    tap('.rail [data-act="insert"]'); tap('[data-act="text"]');
+    check(wb.state.tool === 'text', 'Text tool not on');
+    stroke([[40, 33]]);                                                   // tap above the 3rd line (20 + 2 × 8 mm)
+    check(!d.querySelector('#textPanel').hidden, 'text panel did not open');
+    const ta = d.querySelector('#textIn');
+    ta.value = 'The fox ran up the hill.'; ta.dispatchEvent(new w.Event('input'));
+    tap('[data-act="textDone"]');
+    const [t] = texts();
+    check(t && t.r === 2 && Math.abs(t.x - 40) < 0.01, `text at row ${t && t.r}, x ${t && t.x}; expected row 2 at 40 mm`);
+    check(wb.state.tool === 'pen', `tool is ${wb.state.tool} after Done, expected pen`);
+    check(inkPixels() > 0, 'text not drawn');
+    const g = T.guide(wb.page()), lay = T.layout(wb.page(), t);
+    check(Math.abs(lay.lines[0].y - 36) < 0.01, `first line sits at ${lay.lines[0].y} mm, expected on the line at 36`);
+    wb.page().spacing.ruled = 10; wb.layout();
+    check(Math.abs(T.layout(wb.page(), t).lines[0].y - 40) < 0.01 && T.sizeOn(wb.page(), t) > lay.fs, 'text did not follow wider lines');
+    wb.page().spacing.ruled = 8; wb.layout();
+    const two = { ...wb.page(), tpl: 'thirds2' }, sp2 = two.spacing.thirds2;
+    check(Math.abs(T.guide(two).base(0) - (20 + 3 * sp2)) < 0.01 && Math.abs(T.guide(two).xh - sp2) < 0.01, 'Two dotted: letters should rest on the bottom solid line, small letters filling the bottom third');
+    stroke([[45, 34], [60, 35]], { buttons: 32, button: 5 });           // stylus eraser across the text
+    check(texts().length === 1, 'the eraser removed the text');
+    tap('.rail [data-tool="select"]');
+    const b = T.textBox(wb.page(), t), mid = [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2];
+    ev('pointerdown', toClient(mid)); ev('pointerup', toClient(mid));
+    check(!d.querySelector('#selbar [data-act="selEdit"]').hidden, 'no Edit button for selected text');
+    const to = toClient([mid[0], mid[1] + 8.6]);                         // drag down just over one line
+    ev('pointerdown', toClient(mid)); ev('pointermove', to); ev('pointerup', to);
+    check(texts()[0].r === 3, `moved to row ${texts()[0].r}, expected 3 (snapped to the next line)`);
+    tap('#selbar [data-act="selEdit"]');
+    check(d.querySelector('#textIn').value === 'The fox ran up the hill.', 'Edit did not open the text');
+    ta.value = 'The fox ran down the hill.'; ta.dispatchEvent(new w.Event('input'));
+    tap('[data-act="textDone"]');
+    check(texts().length === 1 && texts()[0].s === 'The fox ran down the hill.', 'edit not saved');
+    wb.undo();
+    check(texts()[0].s === 'The fox ran up the hill.', 'undo did not bring back the old words');
+    tap('.rail [data-tool="pen"]');
+    const cd = new w.DataTransfer(); cd.setData('text/plain', 'Pasted words');
+    d.dispatchEvent(new w.ClipboardEvent('paste', { clipboardData: cd, bubbles: true }));
+    check(!d.querySelector('#textPanel').hidden && ta.value === 'Pasted words', 'pasting text did not open the panel with it');
+    ta.value = 'word '.repeat(1200); ta.dispatchEvent(new w.Event('input'));
+    check(/fit on this page/.test(d.querySelector('#textNote').textContent), 'no warning for text that runs off the page');
+    tap('[data-act="textCancel"]');
+    check(texts().length === 1 && wb.state.tool === 'pen', 'Cancel changed the page or left the Text tool on');
+  });
+
   await test('No errors in the console', () => { check(!errors.length, errors.join(' | ')); });
 }
 

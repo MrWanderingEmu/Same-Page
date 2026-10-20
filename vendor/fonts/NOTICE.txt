@@ -1,0 +1,9 @@
+Fonts used for typed text on the page (both SIL Open Font License 1.1, see the OFL-*.txt files).
+Files are the Latin subsets published by Fontsource (npm, version 5.2.7).
+
+edu-au-vic-wa-nt-pre-500.woff2   Edu AU VIC WA NT Pre, Medium. Label print as taught in Victoria,
+                                  WA and the NT. Copyright 2023 The VIC WA NT School Hand Australia
+                                  Project Authors (Tina Anderson, Corey Anderson).
+playwrite-au-vic-400.woff2       Playwrite AU VIC, Regular. Based on Victorian Modern Cursive.
+                                  Copyright 2023 The Playwrite Project Authors
+                                  (https://github.com/TypeTogether/Playwrite).

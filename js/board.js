@@ -109,7 +109,7 @@ function renderBg(s) {
 }
 function renderInk(s, skip) {
   prep(s.ctxInk);
-  if (s.kind === 'page') drawItems(s.ctxInk, state.pages[s.pi].strokes, skip);
+  if (s.kind === 'page') drawItems(s.ctxInk, state.pages[s.pi].strokes, skip, state.pages[s.pi]);
 }
 export function clearLive(s) { prep(s.ctxLive); }
 
