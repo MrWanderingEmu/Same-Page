@@ -1,6 +1,6 @@
 # Same Page — handover notes
 
-*Last updated 19 October 2026.*
+*Last updated 20 October 2026.*
 
 ## What it is
 
@@ -22,6 +22,8 @@ Same Page is a stylus whiteboard for teachers whose pages match the students' ex
 | `f37c984` | **Lasso Select** (move, resize, recolour, duplicate, delete) and the **laser pointer** |
 | `4998812` | After the first classroom test (19 Oct): **eraser fix**, **landscape pages**, **two-dotted** and **sky-grass-dirt** thirds, **Venn fills the half you tap**, **ruler** (details below) |
 | `e22bfe4` | **Reveal cover** and the **smoke test** page (details below) |
+| `7964c31` | **Toolbar palm guard** and the shelf's storage figure (details below) |
+| *(next)* | **Pictures:** paste, Paste picture button, files, drag and drop (details below) |
 
 ## First classroom test (19 Oct 2026) and what changed
 
@@ -47,7 +49,20 @@ The teacher picked this next. Their choices: prepared ahead and saved with the p
 
 - **Toolbar palm guard.** The teacher is left-handed. Starting to write at the top left, the side of their hand sometimes tapped Highlight on the left rail. The page already ignored palms, but the buttons didn't. Now a touch press on any toolbar button is dropped while the pen is hovering or was used in the last second (`TOOLBAR_PALM_MS` in `ui.js`). Pen, mouse, keyboard and finger taps with the pen away work as before. If palms still get through on the device, the fallback is a "toolbar: pen only" setting.
 - **Shelf storage figure.** It showed `navigator.storage.estimate()`, which includes the offline copy of the app and only shrinks when the browser tidies its database files, so it seemed never to go down after deleting notebooks (the deletes were real). It now adds up the notebooks' own sizes.
-- **Colleague requests, in the agreed order:** images (paste is the main route: Snipping Tool and "Copy image" from the web; also files), PDF pages (a few pages at most, with a page limit), text that sits on the paper's lines, a page overview (reorder, move or copy pages between notebooks, combine notebooks), then a linked OneDrive folder. Sharing notebooks with colleagues means sending a copy as a file, not live shared editing.
+- **Colleague requests, in the agreed order:** images (done, below), PDF pages (a few pages at most, with a page limit), text that sits on the paper's lines, then a page overview (reorder, move or copy pages between notebooks, combine notebooks). **OneDrive is parked**, including the linked folder: the teacher sees no need. Sharing a notebook with a colleague means saving it to a file and sending it, which already works.
+
+## Pictures (20 Oct 2026)
+
+The teacher pastes from the Snipping Tool; colleagues copy pictures from Google or use saved files. No camera photos.
+
+- **A picture is an item in `pg.strokes`:** `{ t:'img', a: assetId, x, y, w, h }` in mm. That's why Undo, Select, Clear, saving changed pages, duplicating notebooks and the save diff all work without changes. `drawItems()` in `draw.js` draws every picture before any ink, so writing is always on top whatever the list order. Anything that reads `s.p` must skip pictures (the eraser, the landscape check, Select's geometry already do).
+- **The eraser never removes a picture,** so rubbing out writing on a worksheet can't take the worksheet with it. *Select › Delete* does. Recolour skips pictures. Resizing keeps the shape (one corner handle, uniform scale).
+- **Storage (`assets.js`):** the `assets` store holds `{ id, blob, w, h }`, where the id is the first 128 bits of the SHA-256 of the stored bytes, so the same picture is stored once. Pictures are shrunk to 1600 px on the longest side and re-encoded as WebP (PNG or JPEG where WebP isn't available), unless one is already under 350 KB and small enough. A 1.6 MB 4000 × 3000 test picture came out at 217 KB.
+- **Tidying:** `pruneAssets()` deletes pictures no saved page uses. It runs at start-up and after deleting a notebook or restoring a backup, but it keeps anything loaded this session, because Undo may bring it back. So a deleted notebook's pictures go at the next start.
+- **Files:** notebook files and backups carry each notebook's pictures as data URLs under `assets`. Older versions of the app simply drop the picture items (they fail `validStroke`).
+- **Placing:** a picture lands at the size it was on screen, shrunk to fit (page width − 30 mm, 55 % of the height), centred on the part of the page in view, or where it was dropped. It's then selected with the Select tool on. A picture that hasn't loaded yet draws as a faint box, and `onAssetReady` redraws when it arrives.
+- **Pasting from the web:** "Copy image" gives real picture data. Copying a selection of a web page gives HTML with a link; the app tries to fetch it, but most sites block that, so it shows a hint to use *Copy image*.
+- **Pictures are opaque,** like a worksheet glued into the book: a white background covers the lines beneath it.
 
 The features themselves, and the keyboard shortcuts, are described in [README.md](README.md).
 
@@ -76,6 +91,8 @@ The features themselves, and the keyboard shortcuts, are described in [README.md
 ## Not yet tested or known gaps
 
 - **Real stylus:** writing has been used in a lesson and works well. Not yet confirmed on the device:
+  - the toolbar palm guard (does a left hand on the rail still press buttons?)
+  - *Insert › Paste picture* (the browser asks once to see the clipboard), and pasting from Snipping Tool and from Google with Ctrl+V
   - the eraser fix (stylus eraser end and the Eraser button)
   - the reveal cover's tab: big enough, and not grabbed by accident
   - the ruler: how easily a stroke catches its edge (7 mm outside / 3 mm inside), and whether the pen moves it by accident
@@ -94,16 +111,13 @@ The features themselves, and the keyboard shortcuts, are described in [README.md
 
 ## Possible next steps (rough priority)
 
-1. **Act on the teacher's detailed feedback (due 20 Oct)** from using the eraser fix, ruler and reveal cover with the stylus, and tune the timings above from real use.
-2. **Insert and paste images.** This has been asked for. Storage already has an empty `assets` space for it. The agreed plan:
-   - shrink photos to about 200–400 KB each
-   - store each image only once (matched by its content)
-   - pages refer to images rather than holding copies
-   - once images are placed, they move and resize with Select
-3. **Writing replay:** replay a page stroke by stroke to show letter formation or the order of a method. Stroke order is already stored.
-4. **Page overview:** thumbnails of every page, to jump to one or drag to reorder.
-5. **Protractor** overlay for modelling angles (the ruler is done). Maybe two-finger twist to turn the ruler.
-6. **Quick notebook switcher** in the toolbar. It was offered alongside the shelf, but the teacher chose the shelf only.
-7. **Linked OneDrive folder:** save notebooks as files in a synced folder, for backup and school ↔ home use. This works in Chrome and Edge only.
-8. **Copy and paste between pages and notebooks;** drag a selection across the spine.
-9. **More automated tests:** the smoke test covers the basics; still untested are shape recognition, storage migration, and backup/restore.
+1. **Real-device check** of the toolbar palm guard and pictures, and tune the timings above from real use.
+2. **PDF pages:** each PDF page becomes a picture filling a new page (built on the pictures above), added after the current page. Use PDF.js. Allow up to 10 pages at a time; for a longer PDF, ask which pages.
+3. **Text that sits on the lines:** paste or type text that flows onto the paper's lines from where you tap, sized to the paper and wrapping at the margin. Ask the teacher which handwriting style their school uses before choosing a font.
+4. **Writing replay:** replay a page stroke by stroke to show letter formation or the order of a method. Stroke order is already stored.
+5. **Page overview** (colleague request): thumbnails of every page, to jump to one or drag to reorder; move or copy pages to another notebook; add a whole notebook into this one. Pictures come along for free, since pages only refer to them.
+6. **Protractor** overlay for modelling angles (the ruler is done). Maybe two-finger twist to turn the ruler.
+7. **Quick notebook switcher** in the toolbar. It was offered alongside the shelf, but the teacher chose the shelf only.
+8. ~~Linked OneDrive folder~~: parked on 20 Oct 2026 at the teacher's request.
+9. **Copy and paste between pages and notebooks;** drag a selection across the spine.
+10. **More automated tests:** the smoke test covers the basics; still untested are shape recognition, storage migration, and backup/restore.

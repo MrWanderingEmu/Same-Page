@@ -1,8 +1,8 @@
-/* Select tool: lasso strokes, then move, resize, recolour, duplicate or delete them.
+/* Select tool: lasso strokes (and pictures), then move, resize, recolour, duplicate or delete them.
    Strokes are never changed in place (undo keeps references to the old ones):
    a move or resize swaps in transformed copies, as one undoable step. */
 import { PEN_COLOURS, HL_COLOURS } from './config.js';
-import { state } from './state.js';
+import { state, isImg } from './state.js';
 import { $ } from './util.js';
 import { view, sheetFor, clearLive, renderInkFor, setOverlay } from './board.js';
 import { drawStroke, tracePath } from './draw.js';
@@ -19,6 +19,7 @@ export const hasSelection = () => !!sel;
 function boxOf(strokes) {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const s of strokes) {
+    if (isImg(s)) { x0 = Math.min(x0, s.x); y0 = Math.min(y0, s.y); x1 = Math.max(x1, s.x + s.w); y1 = Math.max(y1, s.y + s.h); continue; }
     const h = s.w / 2;
     for (let i = 0; i < s.p.length; i += 3) {
       const x = s.p[i], y = s.p[i + 1];
@@ -36,6 +37,7 @@ function inside(x, y, poly) {                  // ray casting; poly = flat [x, y
   return c;
 }
 function nearStroke(s, x, y, r) {
+  if (isImg(s)) return x >= s.x - r && x <= s.x + s.w + r && y >= s.y - r && y <= s.y + s.h + r;
   const p = s.p, rr = r + s.w / 2;
   if (p.length === 3) return Math.hypot(p[0] - x, p[1] - y) <= rr;
   for (let i = 3; i < p.length; i += 3) {
@@ -45,7 +47,14 @@ function nearStroke(s, x, y, r) {
   }
   return false;
 }
-const map = (s, f) => { const p = s.p.slice(); for (let i = 0; i < p.length; i += 3) { const [x, y] = f(p[i], p[i + 1]); p[i] = Math.round(x * 100) / 100; p[i + 1] = Math.round(y * 100) / 100; } return { ...s, p }; };
+const r2 = v => Math.round(v * 100) / 100;
+function map(s, f) {
+  if (isImg(s)) { const [x0, y0] = f(s.x, s.y), [x1, y1] = f(s.x + s.w, s.y + s.h); return { ...s, x: r2(x0), y: r2(y0), w: r2(x1 - x0), h: r2(y1 - y0) }; }
+  return mapPts(s, f);
+}
+/* Points a lasso tests: a stroke's own points, or a 3 × 3 grid over a picture. */
+const samples = s => isImg(s) ? [0, 0.5, 1].flatMap(i => [0, 0.5, 1].flatMap(j => [s.x + i * s.w, s.y + j * s.h, 0])) : s.p;
+const mapPts = (s, f) => { const p = s.p.slice(); for (let i = 0; i < p.length; i += 3) { const [x, y] = f(p[i], p[i + 1]); p[i] = Math.round(x * 100) / 100; p[i + 1] = Math.round(y * 100) / 100; } return { ...s, p }; };
 const moveBy = (dx, dy) => (x, y) => [x + dx, y + dy];
 const scaleFrom = (ox, oy, k) => (x, y) => [ox + (x - ox) * k, oy + (y - oy) * k];
 
@@ -55,6 +64,7 @@ function paint(sheet, strokes, box) {
   clearLive(sheet);
   ctx.save();
   for (const s of strokes) {                   // tint what's selected
+    if (isImg(s)) { ctx.globalAlpha = 0.5; ctx.strokeStyle = ACCENT; ctx.lineWidth = 0.8; ctx.strokeRect(s.x, s.y, s.w, s.h); continue; }
     ctx.globalAlpha = 0.35; ctx.strokeStyle = ACCENT; ctx.lineWidth = s.w + 0.8; ctx.lineCap = ctx.lineJoin = 'round';
     tracePath(ctx, s.p); ctx.stroke();
   }
@@ -146,13 +156,15 @@ export function selUp(g, [x, y]) {
     let len = 0;
     for (let i = 2; i < pts.length; i += 2) len += Math.hypot(pts[i] - pts[i - 2], pts[i + 1] - pts[i - 1]);
     if (len < 3) {                                       // a tap: pick the stroke under it
-      const hit = [...g.pg.strokes].reverse().find(s => nearStroke(s, pts[0], pts[1], 2.5));
+      const top = [...g.pg.strokes].reverse(), near = s => nearStroke(s, pts[0], pts[1], isImg(s) ? 0 : 2.5);
+      const hit = top.find(s => !isImg(s) && near(s)) || top.find(s => isImg(s) && near(s));   // ink sits on top of pictures
       select(g.pg, hit ? [hit] : []);
     } else {                                             // a loop: strokes mostly inside it
       select(g.pg, g.pg.strokes.filter(s => {
+        const p = samples(s);
         let n = 0;
-        for (let i = 0; i < s.p.length; i += 3) if (inside(s.p[i], s.p[i + 1], pts)) n++;
-        return n / (s.p.length / 3) >= 0.5;
+        for (let i = 0; i < p.length; i += 3) if (inside(p[i], p[i + 1], pts)) n++;
+        return n / (p.length / 3) >= 0.5;
       }));
     }
     if (!sel) clearLive(g.sheet);
@@ -184,5 +196,8 @@ export function duplicateSelection() {
 /* Recolours the selection: pen strokes take pen colour i, highlights take highlighter colour i. */
 export function recolourSelection(i) {
   if (!sel) return;
-  replace(new Map(sel.strokes.map(s => [s, { ...s, c: (s.t === 'hl' ? HL_COLOURS : PEN_COLOURS)[i] }])));
+  const ink = sel.strokes.filter(s => !isImg(s));                  // pictures keep their colours
+  if (ink.length) replace(new Map(ink.map(s => [s, { ...s, c: (s.t === 'hl' ? HL_COLOURS : PEN_COLOURS)[i] }])));
 }
+/* Selects these items on a page (a picture just inserted). The Select tool must already be on. */
+export function selectItems(pg, items) { select(pg, items); }

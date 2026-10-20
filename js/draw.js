@@ -92,7 +92,25 @@ export function tracePath(ctx, p) {    // one continuous smoothed path (used for
   }
   ctx.lineTo(p[(n - 1) * 3], p[(n - 1) * 3 + 1]);
 }
+/* Pictures: drawn from whatever assets.js has decoded (main.js connects the two, keeping this
+   module free of storage). A picture that isn't loaded yet shows as a faint box. */
+let pictureFor = () => null;
+export const setPictureSource = fn => { pictureFor = fn; };
+function drawPicture(ctx, s) {
+  const bmp = pictureFor(s.a);
+  ctx.save();
+  if (bmp) { ctx.imageSmoothingQuality = 'high'; ctx.drawImage(bmp, s.x, s.y, s.w, s.h); }
+  else { ctx.fillStyle = '#f1efea'; ctx.fillRect(s.x, s.y, s.w, s.h); ctx.strokeStyle = '#cfc8ba'; ctx.lineWidth = 0.3; ctx.strokeRect(s.x, s.y, s.w, s.h); }
+  ctx.restore();
+}
+/* A page's pictures and ink: every picture first, so writing always sits on top of them.
+   skip = a Set of items to leave out. */
+export function drawItems(ctx, items, skip) {
+  for (const s of items) if (s.t === 'img' && !(skip && skip.has(s))) drawPicture(ctx, s);
+  for (const s of items) if (s.t !== 'img' && !(skip && skip.has(s))) drawStroke(ctx, s);
+}
 export function drawStroke(ctx, s) {
+  if (s.t === 'img') { drawPicture(ctx, s); return; }
   if (s.t === 'hl') {
     ctx.save();
     ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = HL_ALPHA;

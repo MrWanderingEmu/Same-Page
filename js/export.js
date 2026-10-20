@@ -2,8 +2,9 @@
 import { pageSize } from './config.js';
 import { state, visiblePages } from './state.js';
 import { $, toast, download, dateStr, slug } from './util.js';
-import { drawTemplate, drawStroke } from './draw.js';
+import { drawTemplate, drawItems } from './draw.js';
 import { closePops } from './ui.js';
+import { loadAssets, imageIds } from './assets.js';
 
 /* Renders pages side by side at pxPerMm. Each page's ink is clipped to its own page. */
 function renderPagesCanvas(pgs, pxPerMm) {
@@ -18,7 +19,7 @@ function renderPagesCanvas(pgs, pxPerMm) {
     drawTemplate(ctx, pg, pxPerMm);
     ctx.save();
     ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
-    for (const s of pg.strokes) drawStroke(ctx, s);
+    drawItems(ctx, pg.strokes);
     ctx.restore();
     x += W;
   });
@@ -33,8 +34,9 @@ function upright(c) {
   return r;
 }
 
-export function exportPng() {
+export async function exportPng() {
   const idx = visiblePages();
+  await loadAssets(imageIds(idx.map(i => state.pages[i])));
   renderPagesCanvas(idx.map(i => state.pages[i]), 8).toBlob(b => {            // ~200 dpi
     if (!b) { toast("Couldn't create the image."); return; }
     download(b, `${slug(state.nb ? state.nb.title : "same-page")}-${dateStr()}-p${idx.map(i => i + 1).join('-')}.png`);
@@ -45,6 +47,7 @@ export function exportPng() {
 export async function printAll() {
   const box = $('#print'); box.innerHTML = '';
   toast('Preparing pages…');
+  await loadAssets(imageIds(state.pages));
   for (const pg of state.pages) {
     const img = new Image();
     const c = renderPagesCanvas([pg], 6);                                  // ~150 dpi

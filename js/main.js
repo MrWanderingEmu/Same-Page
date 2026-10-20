@@ -2,7 +2,10 @@
 import { COVER_COLOURS } from './config.js';
 import { state, page, makePage } from './state.js';
 import { toast } from './util.js';
-import { stage, layout } from './board.js';
+import { stage, layout, sheets } from './board.js';
+import { setPictureSource } from './draw.js';
+import { bitmap, onAssetReady, pruneAssets } from './assets.js';
+import { initImages, insertPictures } from './images.js';
 import { db, kvGet, migrate, applyPrefs } from './storage.js';
 import { listNotebooks, openNotebook, createNotebook } from './library.js';
 import { undo, redo } from './history.js';
@@ -15,10 +18,19 @@ import { initInput } from './input.js';
   initUI();
   initShelf();
   initInput();
+  initImages();
+  // Redraw once a picture on screen has loaded.
+  setPictureSource(bitmap);
+  let redrawSoon = 0;
+  onAssetReady(id => {
+    const shown = sheets.some(s => s.kind === 'page' && state.pages[s.pi].strokes.some(x => x.a === id));
+    if (shown && !redrawSoon) redrawSoon = requestAnimationFrame(() => { redrawSoon = 0; layout(); });
+  });
   // ?test (used by tests/smoke.html) runs on a blank in-memory notebook and never touches saved work.
   const testing = new URLSearchParams(location.search).has('test');
   if (!testing && await db.open()) {
     await migrate();
+    await pruneAssets();          // pictures no page uses any more (nothing is open yet, so nothing can be undone back)
     applyPrefs(await kvGet('prefs'));
     const last = await kvGet('lastOpen');
     if (!(last && await openNotebook(last))) {
@@ -38,7 +50,7 @@ import { initInput } from './input.js';
   }
   renderTools();
   new ResizeObserver(() => requestAnimationFrame(layout)).observe(stage);
-  window.__wb = { state, page, undo, redo, goPage, addPage, setTemplate, toggleSpread, layout, openShelf }; // handy for testing
+  window.__wb = { state, page, undo, redo, goPage, addPage, setTemplate, toggleSpread, layout, openShelf, insertPictures }; // handy for testing
 })();
 
 // Offline support: once loaded over http(s), the app keeps working without a connection.

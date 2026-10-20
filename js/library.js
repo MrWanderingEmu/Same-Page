@@ -4,6 +4,7 @@ import { state, makePage } from './state.js';
 import { toast, download, dateStr, uid, slug } from './util.js';
 import { db, kvGet, kvSet, saveNow, adopt, closeOpen, cleanMeta, metaRecord, pageRecord, pageFromRecord, pageFromFile, inkBytes } from './storage.js';
 import { showNotebook } from './ui.js';
+import { imageIds, assetsForFile, assetsFromFile, pruneAssets } from './assets.js';
 
 const DAY = 864e5;
 
@@ -62,13 +63,17 @@ export async function deleteNotebook(id) {
   await saveNow();
   if (state.nb && state.nb.id === id) closeOpen();     // so nothing saves it back
   await removeRecords(id);
+  await pruneAssets();
 }
 
 /* --- files --- */
-function notebookJson(meta, pages) {
+/* A notebook as it goes in a file. Its pictures go with it, as data URLs keyed by id. */
+async function notebookJson(meta, pages) {
   const { id, title, colour, created, updated, cur, spread, bookStart, view } = meta;
+  const ids = imageIds(pages);
   return { id, title, colour, created, updated, cur, spread, bookStart, view,
-    pages: pages.map(p => ({ tpl: p.tpl, land: !!p.land, cover: p.cover, spacing: { ...p.spacing }, margin: { ...p.margin }, strokes: p.strokes })) };
+    pages: pages.map(p => ({ tpl: p.tpl, land: !!p.land, cover: p.cover, spacing: { ...p.spacing }, margin: { ...p.margin }, strokes: p.strokes })),
+    ...(ids.length ? { assets: await assetsForFile(ids) } : {}) };
 }
 async function loadForFile(id) {
   if (state.nb && state.nb.id === id) return notebookJson(metaRecord(), state.pages);
@@ -103,6 +108,7 @@ export async function backupAll() {
 
 /* Writes a notebook from a file into storage; returns its id. */
 async function storeFromFile(nb, { keepId } = {}) {
+  await assetsFromFile(nb.assets);
   const id = keepId && typeof nb.id === 'string' && nb.id ? nb.id : uid();
   const pages = (Array.isArray(nb.pages) ? nb.pages : []).map(pageFromFile);
   if (!pages.length) pages.push(makePage());
@@ -142,6 +148,7 @@ async function restoreBackup(data) {
     await storeFromFile(nb, { keepId: true });
   }
   if (reopen) await openNotebook(reopen);
+  await pruneAssets();
   toast(`Restored ${list.length} notebook${s}.`);
   return 'restored';
 }

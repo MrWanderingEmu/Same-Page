@@ -49,8 +49,12 @@ export const cleanCover = (pg, v) => typeof v === 'number' && isFinite(v) ? clam
 export const page = () => state.pages[state.cur];
 export const hasInk = () => state.pages.some(p => p.strokes.length);
 
-/* A stroke: { t:'pen'|'hl', c:colour, w:width mm, pr:pressure-on, p:[x,y,pressure, x,y,pressure, ...] } */
+/* A stroke: { t:'pen'|'hl', c:colour, w:width mm, pr:pressure-on, p:[x,y,pressure, x,y,pressure, ...] }
+   A picture lives in the same list, so Undo, Select and saving treat it like ink:
+   { t:'img', a:asset id (assets.js), x, y, w, h } in mm. It's always drawn under the ink. */
+export const isImg = s => s.t === 'img';
 export function validStroke(s) {
+  if (s && s.t === 'img') return typeof s.a === 'string' && [s.x, s.y, s.w, s.h].every(isFinite) && s.w > 0 && s.h > 0;
   return s && Array.isArray(s.p) && s.p.length >= 3 && s.p.length % 3 === 0 &&
     typeof s.c === 'string' && isFinite(s.w) && (s.t === 'pen' || s.t === 'hl');
 }

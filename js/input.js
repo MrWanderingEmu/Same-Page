@@ -307,6 +307,7 @@ function segDist(px, py, ax, ay, bx, by) {
   return Math.hypot(px - ax - t * dx, py - ay - t * dy);
 }
 function hits(s, x, y, r) {
+  if (s.t === 'img') return false;          // the eraser rubs out writing on a picture, never the picture (Select › Delete does)
   const b = bbox(s);
   if (x < b[0] - r || x > b[2] + r || y < b[1] - r || y > b[3] + r) return false;
   const p = s.p, n = p.length / 3, rr = r + s.w / 2;

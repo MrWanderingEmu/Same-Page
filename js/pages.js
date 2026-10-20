@@ -66,7 +66,7 @@ export function setLandscape(land) {
   pg.land = land;
   renderAll(); renderPaperPop(); scheduleSave();
   const [W, H] = pageSize(pg);
-  const off = pg.strokes.some(s => { for (let i = 0; i < s.p.length; i += 3) if (s.p[i] > W || s.p[i + 1] > H) return true; return false; });
+  const off = pg.strokes.some(s => { if (s.t === 'img') return s.x + s.w > W + 1 || s.y + s.h > H + 1; for (let i = 0; i < s.p.length; i += 3) if (s.p[i] > W || s.p[i + 1] > H) return true; return false; });
   if (off) toast(`Some writing is off the ${land ? 'bottom' : 'side'} of the page. Turn it back to see it.`);
 }
 export function applyPaperToAll() {

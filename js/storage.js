@@ -1,7 +1,7 @@
 /* Browser storage (IndexedDB).
      notebooks  one small record per notebook: title, cover, page order, view settings
      pages      one record per page, so a pen stroke only re-saves the page it's on
-     assets     set aside for images
+     assets     pictures, each stored once and referred to by id from pages (assets.js)
      kv         app-wide preferences and housekeeping (last backup, last notebook open)
    Pen points are stored as whole numbers of 1/100 mm in an Int32Array: about half
    the space of plain numbers, and lossless because points are already rounded to 0.01. */
@@ -9,6 +9,7 @@ import { PEN_COLOURS, HL_COLOURS, COVER_COLOURS } from './config.js';
 import { state, makePage, validStroke, cleanCover } from './state.js';
 import { clamp, toast, uid } from './util.js';
 import { resetHistory } from './history.js';
+import { imageIds, assetBytes, loadAssets } from './assets.js';
 
 const DB_NAME = 'workbook-board';   // the app's original name, kept so existing saved work still loads
 
@@ -55,8 +56,9 @@ export const kvGet = k => db.get('kv', k);
 export const kvSet = (k, v) => db.write(['kv'], kv => kv.put(v, k));
 
 /* --- pages <-> records --- */
-const encStroke = s => ({ t: s.t, c: s.c, w: s.w, pr: !!s.pr, p: Int32Array.from(s.p, v => Math.round(v * 100)) });
-const decStroke = s => ({ t: s.t, c: s.c, w: s.w, pr: !!s.pr, p: Array.from(s.p || [], v => v / 100) });
+const img = s => ({ t: 'img', a: s.a, x: s.x, y: s.y, w: s.w, h: s.h });     // a picture is stored as it is
+const encStroke = s => s.t === 'img' ? img(s) : ({ t: s.t, c: s.c, w: s.w, pr: !!s.pr, p: Int32Array.from(s.p, v => Math.round(v * 100)) });
+const decStroke = s => s.t === 'img' ? img(s) : ({ t: s.t, c: s.c, w: s.w, pr: !!s.pr, p: Array.from(s.p || [], v => v / 100) });
 
 export function pageRecord(pg, nbId) {
   return { id: pg.id, nb: nbId, tpl: pg.tpl, land: !!pg.land, cover: pg.cover, spacing: { ...pg.spacing }, margin: { ...pg.margin }, strokes: pg.strokes.map(encStroke) };
@@ -74,8 +76,10 @@ export function pageFromFile(r) {
   p.strokes = Array.isArray(r.strokes) ? r.strokes.filter(validStroke) : [];
   return p;
 }
-/* Approximate stored size of the ink, in bytes (shown on the shelf). */
-export const inkBytes = pages => pages.reduce((n, pg) => n + pg.strokes.reduce((m, s) => m + s.p.length * 4 + 40, 0), 0);
+/* Approximate stored size of the ink and pictures, in bytes (shown on the shelf).
+   Each picture counts once, however many pages use it. */
+export const inkBytes = pages => pages.reduce((n, pg) => n + pg.strokes.reduce((m, s) => m + (s.p ? s.p.length * 4 : 0) + 40, 0), 0) +
+  imageIds(pages).reduce((n, id) => n + assetBytes(id), 0);
 
 /* Checks a notebook record (from storage or a file) and fills in anything missing. */
 export function cleanMeta(m, pageIds) {
@@ -114,6 +118,7 @@ export function adopt(meta, records) {
   pages.forEach(pg => { if (byId.has(pg.id)) saved.set(pg, mark(pg)); });
   savedIds = new Set(byId.keys());     // includes any stray pages, so the next save tidies them away
   resetHistory();
+  loadAssets(imageIds(pages));         // pictures appear as they load (see onAssetReady in main.js)
 }
 export function closeOpen() { state.nb = null; saved = new WeakMap(); savedIds = new Set(); }
 

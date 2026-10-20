@@ -15,6 +15,7 @@ import { hasSelection, clearSelection, deleteSelection, duplicateSelection, reco
 import { hideDot } from './laser.js';
 import { toggleRuler } from './ruler.js';
 import { toggleCover, renderCovers } from './cover.js';
+import { pastePicture, choosePictureFile } from './images.js';
 
 /* --- tools --- */
 export function buildSwatches() {
@@ -51,9 +52,15 @@ function insertIcon(item) {
   return `<svg viewBox="0 0 48 40">${placeItem(item, a, b).map(pl =>
     `<polyline points="${pl.map(p => p.map(v => v.toFixed(1)).join(',')).join(' ')}"/>`).join('')}</svg>`;
 }
+const PICTURE_ICONS = {
+  pastePic: '<rect x="13" y="7" width="22" height="28" rx="2.5"/><path d="M19 7V5h10v2"/><rect x="18" y="16" width="12" height="10" rx="1"/><path d="M18 24l3.5-3.5 3 3 2-2 3.5 3.5"/>',
+  filePic: '<rect x="8" y="7" width="32" height="26" rx="2.5"/><circle cx="17" cy="15" r="2.6"/><path d="M8 29l10-9 7 6 5-4 10 8"/>',
+};
 function renderInsertPop() {
   const groups = [...new Set(INSERTS.map(i => i.group))];
-  $('#insertPop').innerHTML = groups.map(g => `<div class="group">${g}</div><div class="inserts">${INSERTS.filter(i => i.group === g).map(i =>
+  const pics = [['pastePic', 'Paste picture'], ['filePic', 'From a file']].map(([act, label]) =>
+    `<button class="ins" data-act="${act}"><svg viewBox="0 0 48 40">${PICTURE_ICONS[act]}</svg>${label}</button>`).join('');
+  $('#insertPop').innerHTML = `<div class="group">Pictures</div><div class="inserts">${pics}</div>` + groups.map(g => `<div class="group">${g}</div><div class="inserts">${INSERTS.filter(i => i.group === g).map(i =>
     `<button class="ins${state.tool === 'insert' && state.insert === i.id ? ' on' : ''}" data-insert="${i.id}">${insertIcon(i)}${i.label}</button>`).join('')}</div>`).join('') +
     '<p class="note" style="margin:0">Pick one, then drag a box on the page. For an organiser, tap the page instead to fill it (a Venn fills the half you tap).</p>';
 }
@@ -248,6 +255,8 @@ function onClick(e) {
     case 'applyAll': return applyPaperToAll();
     case 'spread': return toggleSpread();
     case 'ruler': return toggleRuler();
+    case 'pastePic': return pastePicture();
+    case 'filePic': return choosePictureFile();
     case 'cover': return toggleCover();
     case 'view': state.view = state.view === 'page' ? 'width' : 'page'; updateViewBtns(); stage.scrollTop = 0; layout(); scheduleSave(); return;
     case 'present': return togglePresent();

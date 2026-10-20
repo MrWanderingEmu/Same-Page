@@ -5,7 +5,7 @@
 import { $, $$ } from './util.js';
 import { pageSize, ERASER_SIZES } from './config.js';
 import { state, spreadOf } from './state.js';
-import { drawTemplate, drawStroke } from './draw.js';
+import { drawTemplate, drawItems } from './draw.js';
 
 export const stage = $('#stage');
 const wrap = $('#pagewrap'), book = $('#book'), ecur = $('#ecursor'), folios = $$('#folios span');
@@ -108,7 +108,7 @@ function renderBg(s) {
 }
 function renderInk(s, skip) {
   prep(s.ctxInk);
-  if (s.kind === 'page') for (const st of state.pages[s.pi].strokes) if (!skip || !skip.has(st)) drawStroke(s.ctxInk, st);
+  if (s.kind === 'page') drawItems(s.ctxInk, state.pages[s.pi].strokes, skip);
 }
 export function clearLive(s) { prep(s.ctxLive); }
 

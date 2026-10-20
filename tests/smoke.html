@@ -214,6 +214,40 @@ async function run() {
     check(pg.cover == null && !d.querySelector('.sheet .reveal').classList.contains('on'), 'Cover did not come off');
   });
 
+  await test('Pictures: insert, write over, eraser leaves it, move, undo, stored once, saved in files', async () => {
+    fresh();
+    const c = d.createElement('canvas'); c.width = 400; c.height = 300;
+    const x = c.getContext('2d'); x.fillStyle = '#e03030'; x.fillRect(0, 0, 400, 300); x.fillStyle = '#2040e0'; x.fillRect(100, 75, 200, 150);
+    const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+    const [img] = await wb.insertPictures([blob]);
+    const items = () => wb.page().strokes.filter(s => s.t === 'img');
+    check(img && items().length === 1, 'no picture on the page');
+    check(wb.state.tool === 'select', `tool is ${wb.state.tool}, expected Select so it can be moved`);
+    const ink = sheetEl().querySelector('canvas.ink'), ix = ink.getContext('2d'), sc = ink.width / pageW();
+    const px = ([mx, my]) => [...ix.getImageData(Math.round(mx * sc), Math.round(my * sc), 1, 1).data];
+    const mid = [img.x + img.w / 2, img.y + img.h / 2];
+    check(px(mid)[2] > 150 && px(mid)[0] < 100, `picture not drawn (centre pixel ${px(mid)})`);
+    tap('.rail [data-tool="pen"]');
+    stroke([[img.x + 5, mid[1]], [img.x + img.w - 5, mid[1]]]);
+    check(strokes() === 2, 'could not write on the picture');
+    stroke([[mid[0], mid[1]], [mid[0] + 1, mid[1]]], { buttons: 32, button: 5 });
+    check(strokes() === 1 && items().length === 1, 'the eraser should rub out the writing and leave the picture');
+    tap('.rail [data-tool="select"]');
+    const a = toClient(mid), b = toClient([mid[0], mid[1]]);
+    ev('pointerdown', a); ev('pointerup', a);                                   // tap the picture to select it
+    ev('pointerdown', b); ev('pointermove', [b[0] + 20 * k(), b[1]]); ev('pointerup', [b[0] + 20 * k(), b[1]]);
+    const moved = items()[0];
+    check(Math.abs(moved.x - img.x - 20) < 0.5, `picture moved by ${(moved.x - img.x).toFixed(1)} mm, expected 20`);
+    wb.undo();
+    check(Math.abs(items()[0].x - img.x) < 0.01, 'undo did not move it back');
+    const [again] = await wb.insertPictures([blob]);
+    check(again.a === img.a, 'the same picture was stored twice');
+    const assets = await w.eval(`import('${new URL('../js/assets.js', location.href).href}')`);   // the app's own copy of the module
+    const files = await assets.assetsForFile([img.a]);
+    check(/^data:image\//.test(files[img.a] || ''), 'picture missing from the notebook file');
+    tap('.rail [data-tool="pen"]');
+  });
+
   await test('No errors in the console', () => { check(!errors.length, errors.join(' | ')); });
 }
 
