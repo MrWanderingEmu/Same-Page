@@ -2,7 +2,7 @@
 import { pageSize } from './config.js';
 import { state, visiblePages } from './state.js';
 import { $, toast, download, dateStr, slug } from './util.js';
-import { drawTemplate, drawItems } from './draw.js';
+import { drawPaper, drawItems } from './draw.js';
 import { closePops } from './ui.js';
 import { loadAssets, imageIds } from './assets.js';
 
@@ -16,7 +16,7 @@ function renderPagesCanvas(pgs, pxPerMm) {
   pgs.forEach((pg, i) => {
     const [W, H] = sizes[i];
     ctx.setTransform(pxPerMm, 0, 0, pxPerMm, Math.round(x * pxPerMm), 0);
-    drawTemplate(ctx, pg, pxPerMm);
+    drawPaper(ctx, pg, pxPerMm);
     ctx.save();
     ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
     drawItems(ctx, pg.strokes);

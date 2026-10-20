@@ -23,7 +23,8 @@ Same Page is a stylus whiteboard for teachers whose pages match the students' ex
 | `4998812` | After the first classroom test (19 Oct): **eraser fix**, **landscape pages**, **two-dotted** and **sky-grass-dirt** thirds, **Venn fills the half you tap**, **ruler** (details below) |
 | `e22bfe4` | **Reveal cover** and the **smoke test** page (details below) |
 | `7964c31` | **Toolbar palm guard** and the shelf's storage figure (details below) |
-| *(next)* | **Pictures:** paste, Paste picture button, files, drag and drop (details below) |
+| `ae78d2c` | **Pictures:** paste, Paste picture button, files, drag and drop (details below) |
+| *(next)* | **PDF pages** (details below) |
 
 ## First classroom test (19 Oct 2026) and what changed
 
@@ -64,6 +65,17 @@ The teacher pastes from the Snipping Tool; colleagues copy pictures from Google 
 - **Pasting from the web:** "Copy image" gives real picture data. Copying a selection of a web page gives HTML with a link; the app tries to fetch it, but most sites block that, so it shows a hint to use *Copy image*.
 - **Pictures are opaque,** like a worksheet glued into the book: a white background covers the lines beneath it.
 
+## PDF pages (20 Oct 2026)
+
+Colleague request: put in a PDF and write on it. The teacher said PDFs would be a few pages at most, and asked for a limit.
+
+- **A PDF page is the page's paper, not an item on it:** `pg.bg = { a: assetId, x, y, w, h }`, fitted inside the page and centred (`fitBg` in `state.js`). `drawPaper()` draws it on the background canvas on white, in place of the lines. So Select can't drag the worksheet by accident, the eraser can't touch it, and Clear wipes the writing but keeps it, which makes a sheet reusable.
+- **The page underneath keeps the notebook's paper** (copied from the page you were on), hidden. Pages added after a PDF page carry on with the usual paper, and the blank page after the last one previews that paper, not the PDF. *Use this paper on all pages* doesn't turn PDF pages round. The Paper popover on a PDF page shows only portrait/landscape and a note. Turning one refits the worksheet.
+- **`pdf.js`:** each chosen page is rendered with PDF.js at 2200 px on its longest side (about 190 dpi on A4, so text stays sharp in Fit width), saved as WebP 0.9 (JPEG where WebP isn't available), and stored as an asset with `addImage(blob, { ready: true })`, which skips the usual shrinking. The pages go in after the current page, the right way round, and the view jumps to the first of them. A simple worksheet page came out at 35 KB.
+- **Limits:** 10 pages at a time (`MAX_PAGES`); for a longer PDF a `prompt()` asks which pages ("1-3, 5"), parsed by `parsePages`. Files over 60 MB are refused. Password-protected PDFs get their own message.
+- **PDF.js** (`vendor/pdfjs/`, 4.10.38, checksum checked against npm) is loaded with a dynamic `import()` only the first time a PDF is opened. It isn't in the service worker's precache list (it's about 2 MB), but the worker caches every file it fetches, so it works offline after its first use. The `.mjs` files were renamed `.js` so any static host serves them with a JavaScript type. `standard_fonts/` is there for PDFs that use non-embedded fonts like Helvetica. The CJK `cmaps/` were left out. `.gitattributes` keeps `vendor/` byte-for-byte.
+- **Not undoable:** adding PDF pages works like *Add page*, which isn't in Undo either. Delete the page to remove it.
+
 The features themselves, and the keyboard shortcuts, are described in [README.md](README.md).
 
 ## Decisions worth knowing (and why)
@@ -93,6 +105,7 @@ The features themselves, and the keyboard shortcuts, are described in [README.md
 - **Real stylus:** writing has been used in a lesson and works well. Not yet confirmed on the device:
   - the toolbar palm guard (does a left hand on the rail still press buttons?)
   - *Insert › Paste picture* (the browser asks once to see the clipboard), and pasting from Snipping Tool and from Google with Ctrl+V
+  - PDF pages from real worksheets (Word exports, scanned sheets), and how sharp they look in Fit width
   - the eraser fix (stylus eraser end and the Eraser button)
   - the reveal cover's tab: big enough, and not grabbed by accident
   - the ruler: how easily a stroke catches its edge (7 mm outside / 3 mm inside), and whether the pen moves it by accident
@@ -112,12 +125,11 @@ The features themselves, and the keyboard shortcuts, are described in [README.md
 ## Possible next steps (rough priority)
 
 1. **Real-device check** of the toolbar palm guard and pictures, and tune the timings above from real use.
-2. **PDF pages:** each PDF page becomes a picture filling a new page (built on the pictures above), added after the current page. Use PDF.js. Allow up to 10 pages at a time; for a longer PDF, ask which pages.
-3. **Text that sits on the lines:** paste or type text that flows onto the paper's lines from where you tap, sized to the paper and wrapping at the margin. Ask the teacher which handwriting style their school uses before choosing a font.
-4. **Writing replay:** replay a page stroke by stroke to show letter formation or the order of a method. Stroke order is already stored.
-5. **Page overview** (colleague request): thumbnails of every page, to jump to one or drag to reorder; move or copy pages to another notebook; add a whole notebook into this one. Pictures come along for free, since pages only refer to them.
-6. **Protractor** overlay for modelling angles (the ruler is done). Maybe two-finger twist to turn the ruler.
-7. **Quick notebook switcher** in the toolbar. It was offered alongside the shelf, but the teacher chose the shelf only.
-8. ~~Linked OneDrive folder~~: parked on 20 Oct 2026 at the teacher's request.
-9. **Copy and paste between pages and notebooks;** drag a selection across the spine.
-10. **More automated tests:** the smoke test covers the basics; still untested are shape recognition, storage migration, and backup/restore.
+2. **Text that sits on the lines:** paste or type text that flows onto the paper's lines from where you tap, sized to the paper and wrapping at the margin. Three styles: a Sassoon Primary-like print (closed loops, a plain 'a') for the early years, a Victorian Modern Cursive-like hand from Years 3/4, and a plain font like Arial for older students. Check font licences: free look-alikes may be needed.
+3. **Writing replay:** replay a page stroke by stroke to show letter formation or the order of a method. Stroke order is already stored.
+4. **Page overview** (colleague request): thumbnails of every page, to jump to one or drag to reorder; move or copy pages to another notebook; add a whole notebook into this one. Pictures come along for free, since pages only refer to them.
+5. **Protractor** overlay for modelling angles (the ruler is done). Maybe two-finger twist to turn the ruler.
+6. **Quick notebook switcher** in the toolbar. It was offered alongside the shelf, but the teacher chose the shelf only.
+7. ~~Linked OneDrive folder~~: parked on 20 Oct 2026 at the teacher's request.
+8. **Copy and paste between pages and notebooks;** drag a selection across the spine.
+9. **More automated tests:** the smoke test covers the basics; still untested are shape recognition, storage migration, and backup/restore.

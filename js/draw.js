@@ -103,6 +103,13 @@ function drawPicture(ctx, s) {
   else { ctx.fillStyle = '#f1efea'; ctx.fillRect(s.x, s.y, s.w, s.h); ctx.strokeStyle = '#cfc8ba'; ctx.lineWidth = 0.3; ctx.strokeRect(s.x, s.y, s.w, s.h); }
   ctx.restore();
 }
+/* A page's paper: its PDF page if it has one (on white, covering the lines), otherwise its lines. */
+export function drawPaper(ctx, pg, k) {
+  if (!pg.bg) { drawTemplate(ctx, pg, k); return; }
+  const [W, H] = pageSize(pg);
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+  drawPicture(ctx, pg.bg);
+}
 /* A page's pictures and ink: every picture first, so writing always sits on top of them.
    skip = a Set of items to leave out. */
 export function drawItems(ctx, items, skip) {

@@ -11,6 +11,7 @@ import { scheduleSave } from './storage.js';
 import { addImage } from './assets.js';
 import { selectItems } from './select.js';
 import { renderTools, closePops } from './ui.js';
+import { importPdf } from './pdf.js';
 
 const MAX_AT_ONCE = 10;
 const NO_PICTURE = 'There’s no picture to paste. Copy one first: use the Snipping Tool, or right-click a picture and choose Copy image.';
@@ -124,6 +125,8 @@ function onDrop(e) {
   if (!draggable(e.dataTransfer)) return;
   e.preventDefault();
   const t = dropTarget(e); if (!t) return;
+  const pdf = [...e.dataTransfer.files].find(f => f.type === 'application/pdf' || /\.pdf$/i.test(f.name));
+  if (pdf) { importPdf(pdf); return; }
   const files = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/'));
   if (files.length) { insertPictures(files, t.pg, t.at); return; }
   const src = imgSrc(e.dataTransfer.getData('text/html')) || e.dataTransfer.getData('text/uri-list').split('\n').find(l => l && !l.startsWith('#'));
@@ -135,6 +138,7 @@ export function initImages() {
   document.addEventListener('paste', onPaste);
   stage.addEventListener('dragover', e => { if (draggable(e.dataTransfer)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
   stage.addEventListener('drop', onDrop);
+  $('#pdfInput').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; importPdf(f); });
   $('#imgInput').addEventListener('change', e => {
     const files = [...e.target.files]; e.target.value = '';
     insertPictures(files);

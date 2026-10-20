@@ -1,13 +1,14 @@
 /* Service worker: lets the app open and run with no internet connection.
    Network first — you always get the latest version when online, and the
-   cached copy when offline. If you add a new file, add it to FILES too. */
-const CACHE = 'same-page-v7';
+   cached copy when offline. If you add a new file, add it to FILES too.
+   The PDF reader (vendor/pdfjs, about 2 MB) isn't listed: it's cached the first time a PDF is opened. */
+const CACHE = 'same-page-v8';
 const FILES = [
   './', 'index.html', 'css/styles.css', 'manifest.webmanifest', 'icon.svg',
   'js/main.js', 'js/util.js', 'js/config.js', 'js/state.js', 'js/storage.js', 'js/draw.js',
   'js/board.js', 'js/history.js', 'js/pages.js', 'js/input.js', 'js/export.js', 'js/ui.js',
   'js/library.js', 'js/shelf.js', 'js/shapes.js', 'js/select.js', 'js/laser.js', 'js/ruler.js', 'js/cover.js',
-  'js/assets.js', 'js/images.js',
+  'js/assets.js', 'js/images.js', 'js/pdf.js',
 ];
 
 self.addEventListener('install', e => {

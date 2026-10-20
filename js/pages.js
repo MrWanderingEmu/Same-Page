@@ -1,5 +1,5 @@
 /* Navigating, adding and deleting pages; paper settings; one- or two-page view. */
-import { state, page, makePage, spreadOf, visiblePages } from './state.js';
+import { state, page, makePage, spreadOf, visiblePages, fitBg } from './state.js';
 import { clamp, toast } from './util.js';
 import { pageSize } from './config.js';
 import { stage, layout, renderAll, renderBgFor, updateFolios } from './board.js';
@@ -49,7 +49,7 @@ export function addPageAtEnd() {
 export function deletePage() {
   if (state.pages.length < 2) return;
   const n = state.cur + 1;
-  if (page().strokes.length && !confirm(`Delete page ${n}? This can't be undone.`)) return;
+  if ((page().strokes.length || page().bg) && !confirm(`Delete page ${n}? This can't be undone.`)) return;
   forgetPage(page());
   state.pages.splice(state.cur, 1);
   goPage(Math.min(state.cur, state.pages.length - 1), true);
@@ -64,6 +64,7 @@ export function setLandscape(land) {
   const pg = page();
   if (pg.land === land) return;
   pg.land = land;
+  if (pg.bg) pg.bg = fitBg(pg, pg.bg.w / pg.bg.h, pg.bg.a);       // the PDF page refits the turned paper
   renderAll(); renderPaperPop(); scheduleSave();
   const [W, H] = pageSize(pg);
   const off = pg.strokes.some(s => { if (s.t === 'img') return s.x + s.w > W + 1 || s.y + s.h > H + 1; for (let i = 0; i < s.p.length; i += 3) if (s.p[i] > W || s.p[i + 1] > H) return true; return false; });
@@ -71,7 +72,7 @@ export function setLandscape(land) {
 }
 export function applyPaperToAll() {
   const src = page();
-  state.pages.forEach(p => { p.tpl = src.tpl; p.land = src.land; p.spacing = { ...src.spacing }; p.margin = { ...src.margin }; });
+  state.pages.forEach(p => { p.tpl = src.tpl; if (!p.bg) p.land = src.land; p.spacing = { ...src.spacing }; p.margin = { ...src.margin }; });
   renderAll();
   toast(`Paper applied to all ${state.pages.length} pages.`);
   scheduleSave();

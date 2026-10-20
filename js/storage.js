@@ -6,7 +6,7 @@
    Pen points are stored as whole numbers of 1/100 mm in an Int32Array: about half
    the space of plain numbers, and lossless because points are already rounded to 0.01. */
 import { PEN_COLOURS, HL_COLOURS, COVER_COLOURS } from './config.js';
-import { state, makePage, validStroke, cleanCover } from './state.js';
+import { state, makePage, validStroke, cleanCover, cleanBg } from './state.js';
 import { clamp, toast, uid } from './util.js';
 import { resetHistory } from './history.js';
 import { imageIds, assetBytes, loadAssets } from './assets.js';
@@ -61,18 +61,18 @@ const encStroke = s => s.t === 'img' ? img(s) : ({ t: s.t, c: s.c, w: s.w, pr: !
 const decStroke = s => s.t === 'img' ? img(s) : ({ t: s.t, c: s.c, w: s.w, pr: !!s.pr, p: Array.from(s.p || [], v => v / 100) });
 
 export function pageRecord(pg, nbId) {
-  return { id: pg.id, nb: nbId, tpl: pg.tpl, land: !!pg.land, cover: pg.cover, spacing: { ...pg.spacing }, margin: { ...pg.margin }, strokes: pg.strokes.map(encStroke) };
+  return { id: pg.id, nb: nbId, tpl: pg.tpl, land: !!pg.land, cover: pg.cover, bg: pg.bg, spacing: { ...pg.spacing }, margin: { ...pg.margin }, strokes: pg.strokes.map(encStroke) };
 }
 export function pageFromRecord(r) {
   const p = makePage(r, r.id);
-  p.cover = cleanCover(p, r.cover);
+  p.cover = cleanCover(p, r.cover); p.bg = cleanBg(r.bg);
   p.strokes = (r.strokes || []).map(decStroke).filter(validStroke);
   return p;
 }
 /* A page from a notebook file (plain arrays). */
 export function pageFromFile(r) {
   const p = makePage(r);
-  p.cover = cleanCover(p, r.cover);
+  p.cover = cleanCover(p, r.cover); p.bg = cleanBg(r.bg);
   p.strokes = Array.isArray(r.strokes) ? r.strokes.filter(validStroke) : [];
   return p;
 }
@@ -102,7 +102,7 @@ export function cleanMeta(m, pageIds) {
 /* What's already in storage, so a save only writes pages that changed. */
 let saved = new WeakMap();    // page -> { strokes (array ref), n (length), paper (key) }
 let savedIds = new Set();     // page ids stored for the open notebook
-const paperKey = pg => pg.tpl + (pg.land ? 'L' : 'P') + pg.cover + JSON.stringify(pg.spacing) + JSON.stringify(pg.margin);   // and the cover
+const paperKey = pg => pg.tpl + (pg.land ? 'L' : 'P') + pg.cover + JSON.stringify(pg.spacing) + JSON.stringify(pg.margin) + JSON.stringify(pg.bg);   // and the cover and PDF page
 const mark = pg => ({ strokes: pg.strokes, n: pg.strokes.length, paper: paperKey(pg) });
 
 /* Makes a notebook the open one. records = its page records as found in storage. */

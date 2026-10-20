@@ -23,12 +23,15 @@ export const state = {
 
 /* A new page, copying the paper (not the ink) of src if given.
    land = the page is turned on its side (landscape).
-   cover = where the reveal cover's top edge sits (mm from the top), or null for no cover. */
+   cover = where the reveal cover's top edge sits (mm from the top), or null for no cover.
+   bg = a page from a PDF lying over the paper, or null: { a: asset id, x, y, w, h } in mm.
+   It belongs to the paper, not the ink: Select, the eraser and Clear leave it alone,
+   and new pages don't copy it. */
 const LINED = Object.keys(TEMPLATES).filter(k => TEMPLATES[k].spacing);
 export function makePage(src, id) {
   const p = {
     id: typeof id === 'string' && id ? id : uid(),
-    tpl: 'ruled', land: false, cover: null,
+    tpl: 'ruled', land: false, cover: null, bg: null,
     spacing: Object.fromEntries(LINED.map(k => [k, TEMPLATES[k].spacing.def])),
     margin:  Object.fromEntries(LINED.map(k => [k, TEMPLATES[k].margin])),
     strokes: [],
@@ -44,6 +47,15 @@ export function makePage(src, id) {
   }
   return p;
 }
+/* A box of aspect ratio `ratio` (width / height) fitted inside a pg-sized page, centred: where a PDF page goes. */
+export function fitBg(pg, ratio, a) {
+  const [W, H] = pageSize(pg), r2 = v => Math.round(v * 100) / 100;
+  const w = Math.min(W, H * ratio), h = w / ratio;
+  return { a, x: r2((W - w) / 2), y: r2((H - h) / 2), w: r2(w), h: r2(h) };
+}
+/* A saved PDF page, checked, or null. */
+export const cleanBg = b => b && typeof b.a === 'string' && [b.x, b.y, b.w, b.h].every(isFinite) && b.w > 0 && b.h > 0
+  ? { a: b.a, x: +b.x, y: +b.y, w: +b.w, h: +b.h } : null;
 /* A saved cover position, checked: a number of mm down the page, or null. */
 export const cleanCover = (pg, v) => typeof v === 'number' && isFinite(v) ? clamp(v, 0, pageSize(pg)[1]) : null;
 export const page = () => state.pages[state.cur];

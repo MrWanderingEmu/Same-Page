@@ -55,11 +55,12 @@ async function prepare(blob, bmp) {
   return { blob: out, w, h };
 }
 
-/* Adds a picture (a File or Blob). Resolves to { id, w, h } in pixels, or null if it isn't a picture. */
-export async function addImage(file) {
+/* Adds a picture (a File or Blob). Resolves to { id, w, h } in pixels, or null if it isn't a picture.
+   ready = it's already the right size and format (a rendered PDF page), so store it as it is. */
+export async function addImage(file, { ready = false } = {}) {
   const bmp = await decode(file);
   if (!bmp) return null;
-  const p = await prepare(file, bmp);
+  const p = ready ? { blob: file, w: sizeOf(bmp)[0], h: sizeOf(bmp)[1] } : await prepare(file, bmp);
   if (!p) return null;
   const id = await hashOf(p.blob);
   if (!cache.has(id)) {
@@ -86,8 +87,9 @@ export function loadAssets(ids) {
   }));
 }
 
-/* The pictures referred to by some pages (or page records). */
-export const imageIds = pages => [...new Set(pages.flatMap(pg => (pg.strokes || []).filter(s => s.t === 'img').map(s => s.a)))];
+/* The pictures referred to by some pages (or page records): pictures on them and PDF pages under them. */
+export const imageIds = pages => [...new Set(pages.flatMap(pg =>
+  (pg.strokes || []).filter(s => s.t === 'img').map(s => s.a).concat(pg.bg && pg.bg.a ? [pg.bg.a] : [])))];
 
 /* --- files: pictures travel inside notebook files as data URLs --- */
 const toDataUrl = blob => new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => res(null); r.readAsDataURL(blob); });

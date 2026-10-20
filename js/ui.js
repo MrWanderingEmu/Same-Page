@@ -55,10 +55,11 @@ function insertIcon(item) {
 const PICTURE_ICONS = {
   pastePic: '<rect x="13" y="7" width="22" height="28" rx="2.5"/><path d="M19 7V5h10v2"/><rect x="18" y="16" width="12" height="10" rx="1"/><path d="M18 24l3.5-3.5 3 3 2-2 3.5 3.5"/>',
   filePic: '<rect x="8" y="7" width="32" height="26" rx="2.5"/><circle cx="17" cy="15" r="2.6"/><path d="M8 29l10-9 7 6 5-4 10 8"/>',
+  pdfPages: '<path d="M14 4h14l8 8v24H14z"/><path d="M28 4v8h8"/><path d="M19 19h12M19 24h12M19 29h8"/>',
 };
 function renderInsertPop() {
   const groups = [...new Set(INSERTS.map(i => i.group))];
-  const pics = [['pastePic', 'Paste picture'], ['filePic', 'From a file']].map(([act, label]) =>
+  const pics = [['pastePic', 'Paste picture'], ['filePic', 'Picture file'], ['pdfPages', 'PDF pages']].map(([act, label]) =>
     `<button class="ins" data-act="${act}"><svg viewBox="0 0 48 40">${PICTURE_ICONS[act]}</svg>${label}</button>`).join('');
   $('#insertPop').innerHTML = `<div class="group">Pictures</div><div class="inserts">${pics}</div>` + groups.map(g => `<div class="group">${g}</div><div class="inserts">${INSERTS.filter(i => i.group === g).map(i =>
     `<button class="ins${state.tool === 'insert' && state.insert === i.id ? ' on' : ''}" data-insert="${i.id}">${insertIcon(i)}${i.label}</button>`).join('')}</div>`).join('') +
@@ -154,6 +155,12 @@ export function drawPreview(c, tpl, land = false) {
 }
 export function renderPaperPop() {
   const pop = $('#paperPop'), pg = page(), t = pg.tpl, T = TEMPLATES[t];
+  if (pg.bg) {     // a PDF page covers the paper, so there's nothing to choose
+    pop.innerHTML = `<h3>Paper — page ${state.cur + 1}</h3>
+      <div class="seg orient"><button data-orient="port"${pg.land ? '' : ' class="on"'}>Portrait</button><button data-orient="land"${pg.land ? ' class="on"' : ''}>Landscape</button></div>
+      <p class="note">This page is a page from a PDF, so it has no lines of its own. Clear wipes the writing and keeps the PDF; to remove the PDF, delete the page.</p>`;
+    return;
+  }
   pop.innerHTML = `
     <h3>Paper — page ${state.cur + 1}</h3>
     <div class="seg orient"><button data-orient="port"${pg.land ? '' : ' class="on"'}>Portrait</button><button data-orient="land"${pg.land ? ' class="on"' : ''}>Landscape</button></div>
@@ -257,6 +264,7 @@ function onClick(e) {
     case 'ruler': return toggleRuler();
     case 'pastePic': return pastePicture();
     case 'filePic': return choosePictureFile();
+    case 'pdfPages': closePops(); return $('#pdfInput').click();
     case 'cover': return toggleCover();
     case 'view': state.view = state.view === 'page' ? 'width' : 'page'; updateViewBtns(); stage.scrollTop = 0; layout(); scheduleSave(); return;
     case 'present': return togglePresent();

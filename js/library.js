@@ -72,7 +72,7 @@ async function notebookJson(meta, pages) {
   const { id, title, colour, created, updated, cur, spread, bookStart, view } = meta;
   const ids = imageIds(pages);
   return { id, title, colour, created, updated, cur, spread, bookStart, view,
-    pages: pages.map(p => ({ tpl: p.tpl, land: !!p.land, cover: p.cover, spacing: { ...p.spacing }, margin: { ...p.margin }, strokes: p.strokes })),
+    pages: pages.map(p => ({ tpl: p.tpl, land: !!p.land, cover: p.cover, ...(p.bg ? { bg: p.bg } : {}), spacing: { ...p.spacing }, margin: { ...p.margin }, strokes: p.strokes })),
     ...(ids.length ? { assets: await assetsForFile(ids) } : {}) };
 }
 async function loadForFile(id) {

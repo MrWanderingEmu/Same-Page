@@ -23,7 +23,7 @@ import { initInput } from './input.js';
   setPictureSource(bitmap);
   let redrawSoon = 0;
   onAssetReady(id => {
-    const shown = sheets.some(s => s.kind === 'page' && state.pages[s.pi].strokes.some(x => x.a === id));
+    const shown = sheets.some(s => s.kind === 'page' && (state.pages[s.pi].strokes.some(x => x.a === id) || (state.pages[s.pi].bg || {}).a === id));
     if (shown && !redrawSoon) redrawSoon = requestAnimationFrame(() => { redrawSoon = 0; layout(); });
   });
   // ?test (used by tests/smoke.html) runs on a blank in-memory notebook and never touches saved work.

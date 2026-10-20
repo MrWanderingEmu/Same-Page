@@ -5,7 +5,7 @@
 import { $, $$ } from './util.js';
 import { pageSize, ERASER_SIZES } from './config.js';
 import { state, spreadOf } from './state.js';
-import { drawTemplate, drawItems } from './draw.js';
+import { drawTemplate, drawPaper, drawItems } from './draw.js';
 
 export const stage = $('#stage');
 const wrap = $('#pagewrap'), book = $('#book'), ecur = $('#ecursor'), folios = $$('#folios span');
@@ -104,7 +104,8 @@ function renderBg(s) {
   prep(s.ctxBg);
   // The blank page after the last one previews the paper a new page would get.
   const pg = s.kind === 'page' ? state.pages[s.pi] : s.kind === 'ghost' ? state.pages[state.pages.length - 1] : null;
-  if (pg) drawTemplate(s.ctxBg, pg, view.scale * view.dpr);
+  if (pg && s.kind === 'page') drawPaper(s.ctxBg, pg, view.scale * view.dpr);
+  else if (pg) drawTemplate(s.ctxBg, pg, view.scale * view.dpr);     // a new page wouldn't copy a PDF page
 }
 function renderInk(s, skip) {
   prep(s.ctxInk);
